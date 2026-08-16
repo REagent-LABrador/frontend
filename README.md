@@ -11,6 +11,8 @@ labels (REPRESENTATIVE / MODELED / NOT decision-grade) impossible to miss.
 # Integrated judging path (run from labrador-demo-orchestrator after bootstrap)
 uv run python app.py serve             # UI + API on one process, port 8787
 open http://127.0.0.1:8787/
+open "http://127.0.0.1:8787/?mode=scientific"  # explicit v3 IRAK4 replay
+open "http://127.0.0.1:8787/?run=LR-..."       # attach to an existing run
 
 # Split-process frontend development
 bun serve.ts 4173                      # serve app/ (loopback, port 4173)
@@ -57,6 +59,13 @@ The app in `app/` runs against one of two data sources:
 Any backend that implements `POST /api/runs` and `GET /api/runs/:id/snapshot`
 gets the full three-screen UI for free.
 
+The default URL retains the v0 demo-compatible setup. `?mode=scientific` is an
+explicit opt-in that posts the checked-in IRAK4/RA `labrador.run-setup.v3`
+replay frame with `presentationMode: SCIENTIFIC`, one HypGen run per selected
+focus, and no representative overlay. `?run=<LR-id>` creates nothing; it
+attaches read-only to that run and renders whichever snapshot contract the
+server returns.
+
 ## Honesty rules the UI enforces
 
 - **Ceilings, not quotas.** Setup numbers are caps. Stages report `requested`
@@ -73,6 +82,18 @@ gets the full three-screen UI for free.
   `display_metric_basis=REPRESENTATIVE_DEMO_SCENARIO_V1`. Those values drive
   graph placement and the client-side Pareto view while native metrics and
   station artifacts remain unchanged and inspectable through run artifacts.
+- **Scientific packets stay scientific.** A
+  `labrador.scientific-snapshot.v1` never uses browser or representative values
+  to determine comparison membership. The UI posts the terminal packets to
+  server Highlander, then renders its frontier, incomparable records, exact
+  hashes, and producer-grounded next evidence action. It does not substitute a
+  client frontier if that server result is absent.
+- **Native branch artifacts remain native.** Scientific inspectors show exact
+  input/output refs and hashes, producer identity, origin, terminal reason and
+  message, and the unchanged payload—including clinical `simulated_*` names.
+- **Representative watermark is opt-in.** It appears only when the scientific
+  snapshot explicitly reports both `presentation_mode: REPRESENTATIVE_DEMO`
+  and `representative_demo: true`.
 - **Three-axis plan map.** Highlander maps every returned plan as a numbered,
   selectable point using exactly P50 rNPV (ROI), recruitability, and simulation
   / tractability. Plausibility remains visible comparison context but does not

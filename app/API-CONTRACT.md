@@ -265,9 +265,49 @@ Abstain (`abstention: true` + reason in `answer`) when the run can't support an
 answer. If the endpoint is missing, the client abstains on the backend's behalf
 — it never invents an answer.
 
+## Scientific branch snapshot v1
+
+The explicit `/?mode=scientific` path posts `labrador.run-setup.v3` and consumes
+`labrador.scientific-snapshot.v1`. The default v0 path above remains supported.
+The scientific response contains top-level `branches`; each branch has a real
+`focus` and `nodes` keyed by `hypothesis_generator`, `clinical_simulation`,
+`simulation`, and `roi_calculator`. Every public node exposes its terminal
+`status`, exact `reason_code` and `message`, `output_origin`, input/output refs
+and hashes, `producer`, and unchanged `artifact`.
+
+Scientific mode has three additional invariants:
+
+- `scientific_packet_excludes_representative_values` is `true`; presentation
+  values never determine hashes or comparison membership.
+- A watermark is rendered only when both `presentation_mode` is
+  `REPRESENTATIVE_DEMO` and `representative_demo` is `true`.
+- The browser displays `highlander.result` as returned by the server, including
+  `frontier`, `dominated`, `incomparable`, candidate objective observations,
+  and `nextEvidenceAction`. Until that result exists, the UI says it is waiting
+  and computes no substitute frontier.
+
+### `POST /api/runs/:id/highlander`
+
+Request:
+
+```json
+{ "acknowledgeGaps": true }
+```
+
+The response may be the scientific snapshot directly or the orchestrator UI
+state containing it at `scientific`. The frontend requires the refreshed
+`labrador.scientific-snapshot.v1` and will not silently fall back to its legacy
+client comparator.
+
+### Attach mode
+
+`/?run=<LR-id>` performs no create call. It attaches read-only to the supplied
+run and begins polling `GET /api/runs/:id/snapshot`. It can be combined with
+`mode=scientific` to label the intent before the first snapshot arrives.
+
 ## Not in v0 (documented gaps)
 
-- **Highlander runs client-side** off the snapshot's programs (same Pareto
+- **Legacy v0 Highlander runs client-side** off the snapshot's programs (same Pareto
   logic in mock and http modes). Its baseline vector is exactly
   `metrics.rnpv` (ROI), `metrics.recruit` (recruitability), and the simulation
   / tractability value (`metrics.tractability_fit`, or native `metrics.support`
@@ -278,8 +318,8 @@ answer. If the endpoint is missing, the client abstains on the backend's behalf
   remaining comparison-panel height beneath the objective table. The RA demo's
   Z value is explicitly labeled representative branch-context fit; the shared
   native cached dossier remains attached and is not presented as a
-  candidate-specific simulation result. A server-side Highlander job endpoint
-  is a future addition.
+  candidate-specific simulation result. Scientific v1 uses the server endpoint
+  documented above instead.
 - **Review actions** (shortlist/constraint/exclude) are recorded in a
   client-side audit log only; `POST /api/runs/:id/actions` is future work.
 - **No auth/identity.** Do not present actor fields as verified.

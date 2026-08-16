@@ -6,8 +6,12 @@ import { fileURLToPath } from "node:url";
 
 import {
   interpretabilityView,
+  isScientificSnapshot,
   normalizeStageTruth,
   resolveBackendBase,
+  scientificCandidateId,
+  scientificComparisonStatus,
+  scientificNodeForStage,
   stationPayloadFor,
 } from "./app/js/snapshot-contract.js";
 
@@ -103,6 +107,24 @@ assert.equal(
   "http://127.0.0.1:8787",
   "an integrated one-process run must use the serving origin",
 );
+
+const scientificFixture = JSON.parse(
+  readFileSync(
+    new URL("./tests/fixtures/orchestrator-scientific-snapshot.json", import.meta.url),
+    "utf8",
+  ),
+);
+assert.equal(isScientificSnapshot(scientificFixture), true);
+assert.equal(scientificCandidateId(scientificFixture.branches[0]), "H-b1");
+assert.equal(
+  scientificNodeForStage(scientificFixture.branches[0], "recruitability").artifact
+    .simulated_months_to_enroll,
+  22,
+);
+assert.equal(
+  scientificComparisonStatus(scientificFixture.highlander.result, "H-p1"),
+  "FRONTIER",
+);
 assert.equal(
   resolveBackendBase("?base=http%3A%2F%2Flocalhost%3A9999", "http://127.0.0.1:8787"),
   "http://localhost:9999",
@@ -129,6 +151,9 @@ for (const required of [
   "stationPayloadFor",
   "interpretabilityView",
   "HIGHLANDER CLIENT-SIDE · SERVER CONSUMER NOT WIRED",
+  "labrador.run-setup.v3",
+  "Run server Highlander",
+  "scientific_packet_excludes_representative_values",
 ]) {
   assert.ok(app.includes(required), `functional app must wire ${required}`);
 }
@@ -183,3 +208,4 @@ console.log("  Payloads: biomarker singular and program stage maps are consumed.
 console.log("  Interpretability: readable projection retains native JSON verbatim.");
 console.log("  Backend base: integrated serving defaults to same origin.");
 console.log("  Highlander: returned plans map to the ROI × recruitability × simulation 3D view; the chart fills its panel.");
+console.log("  Scientific v1: native branches and server Highlander results stay separate from representative display values.");

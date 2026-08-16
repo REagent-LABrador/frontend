@@ -61,6 +61,19 @@ export function createHttpBackend(baseUrl) {
       );
     },
 
+    // POST /api/runs/:id/highlander — runs the pinned server consumer and
+    // returns the refreshed server state. Scientific mode never computes a
+    // substitute frontier in the browser.
+    async launchHighlander(runId, acknowledgeGaps) {
+      return requestJson(
+        `${base}/api/runs/${encodeURIComponent(runId)}/highlander`,
+        {
+          method: "POST",
+          body: JSON.stringify({ acknowledgeGaps: acknowledgeGaps === true }),
+        },
+      );
+    },
+
     // Poll the snapshot every 5s until every stage is terminal.
     // onSnapshot(snapshot) on every successful fetch;
     // onFreshness({state, failures}) on transport-state changes.

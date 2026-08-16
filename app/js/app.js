@@ -1,8 +1,15 @@
     import { createHttpBackend } from "./backend-http.js";
     import {
       interpretabilityView,
+      isScientificSnapshot,
       normalizeStageTruth,
       resolveBackendBase,
+      scientificCandidateId,
+      scientificComparisonStatus,
+      scientificHighlanderCandidate,
+      scientificModuleId,
+      scientificNodeForStage,
+      scientificStageId,
       stationPayloadFor
     } from "./snapshot-contract.js";
 
@@ -13,7 +20,15 @@
       var params = new URLSearchParams(window.location.search);
       var mode = params.get("backend") === "mock" ? "mock" : "http";
       var base = resolveBackendBase(window.location.search, window.location.origin);
-      return { mode: mode, base: base, http: mode === "http" ? createHttpBackend(base) : null };
+      var launchMode = params.get("mode") === "scientific" ? "scientific" : "legacy";
+      var runId = params.get("run");
+      return {
+        mode: mode,
+        base: base,
+        launchMode: launchMode,
+        runId: runId && runId.trim() ? runId.trim() : null,
+        http: mode === "http" ? createHttpBackend(base) : null
+      };
     }());
 
     (function () {
@@ -159,6 +174,14 @@
         lastUpdated: null,
         highlanderReady: false,
         highlanderLaunched: false,
+        highlanderLaunching: false,
+        highlanderResult: null,
+        highlanderResultHash: null,
+        scientificSnapshot: false,
+        representativeDemo: false,
+        scientificPacketExcludesRepresentativeValues: false,
+        presentationMode: null,
+        executionMode: null,
         selectedProgramId: null,
         scenario: "balanced",
         metrics: {
@@ -205,7 +228,9 @@
         programDetail: document.getElementById("program-detail"),
         scenarioMeta: document.getElementById("scenario-meta"),
         weightList: document.getElementById("weight-list"),
-        chatLog: document.getElementById("chat-log")
+        chatLog: document.getElementById("chat-log"),
+        representativeWatermark: document.getElementById("representative-watermark"),
+        serverHighlanderResult: document.getElementById("server-highlander-result")
       };
 
       function escapeHTML(value) {
@@ -291,8 +316,12 @@
         var valid = indicationValid && biomarkers.valid && papers.valid && hypotheses.valid;
 
         if (biomarkers.valid && hypotheses.valid) {
-          var branches = biomarkers.value * hypotheses.value;
-          elements.branchPreview.textContent = "Up to " + biomarkers.value + " biomarker" + (biomarkers.value === 1 ? "" : "s") + " and up to " + branches + " hypothesis branch" + (branches === 1 ? "" : "es") + ".";
+          if (BOOT.launchMode === "scientific") {
+            elements.branchPreview.textContent = "Up to " + biomarkers.value + " evidence focus branch" + (biomarkers.value === 1 ? "" : "es") + "; one full HypGen run per focus. Scientific packets exclude presentation values.";
+          } else {
+            var branches = biomarkers.value * hypotheses.value;
+            elements.branchPreview.textContent = "Up to " + biomarkers.value + " biomarker" + (biomarkers.value === 1 ? "" : "s") + " and up to " + branches + " hypothesis branch" + (branches === 1 ? "" : "es") + ".";
+          }
         } else {
           elements.branchPreview.textContent = "Enter valid ceilings to preview requested capacity.";
         }
@@ -303,6 +332,90 @@
           biomarkers: biomarkers.value,
           papers: papers.value,
           hypotheses: hypotheses.value
+        };
+      }
+
+      function buildScientificSetup(validation) {
+        return {
+          schemaVersion: "labrador.run-setup.v3",
+          execution: {
+            mode: "REPLAY",
+            presentationMode: "SCIENTIFIC"
+          },
+          exploration: {
+            evidenceRequest: {
+              ask: "new_question",
+              target: "can a small-molecule IRAK4 inhibitor suppress synovial fibroblast-driven inflammation in rheumatoid arthritis, or is its effect confined to the myeloid compartment?",
+              depth: "deep",
+              reason: "frozen golden path for the REagent-LABrador integration demo"
+            },
+            focus: { maxBranches: validation.biomarkers },
+            hypothesis: {
+              profile: "default",
+              roi: {
+                requestId: "IRAK4-RA-scientific-roi",
+                comparables: [],
+                execution: {
+                  simulations: 128,
+                  seed: 42,
+                  simulationAssumptions: {}
+                }
+              }
+            }
+          },
+          program: {
+            frame: {
+              schemaVersion: "labrador.scientific-program-frame.v1",
+              frameId: "IRAK4-RA-scientific",
+              basis: "ANALYST_SUPPLIED",
+              asset: {
+                name: "IRAK4 inhibitor",
+                modality: "small_molecule",
+                sponsor: null
+              },
+              target: {
+                symbol: "IRAK4",
+                direction: "inhibit",
+                uniprotAccession: "Q9NWZ3"
+              },
+              disease: { name: validation.indication, subtype: null },
+              biomarkerDefaults: {
+                prevalenceInDisease: 0.4,
+                assayAvailable: true
+              },
+              endpoint: {
+                name: "ACR50 response",
+                type: "binary",
+                expectedEffectSize: 0.3
+              },
+              tissue: "synovium",
+              simulationContext: {
+                interactionToDisrupt: "IRAK4 catalytic function",
+                mechanismHypothesis: "orthosteric",
+                asOfDate: null
+              },
+              notes: [
+                "Scientific assembly may use only this frame plus branch evidence and hypothesis output."
+              ]
+            },
+            valuationFrame: {
+              base_year: 2026,
+              valuation_year: 2026,
+              launch_year: 2034,
+              filing_year: 2026,
+              currency: "USD",
+              geography: "United States",
+              therapeutic_area: "Immunology",
+              target_population: "Adults with active rheumatoid arthritis",
+              line_of_therapy: "Second line",
+              route: "ORAL",
+              current_stage: "Preclinical",
+              modality: "SMALL_MOLECULE",
+              target: "IRAK4",
+              expansion_launch_year: null,
+              notes: "Analyst-supplied valuation assumptions; separate from scientific thesis fields."
+            }
+          }
         };
       }
 
@@ -616,6 +729,34 @@
         node.metadata.warnings = Array.isArray(stageRow.warnings) ? stageRow.warnings.slice() : [];
       }
 
+      function applyScientificNodeTruth(node, stage, program) {
+        if (!state.scientificSnapshot || !program || stage === "biomarker") return;
+        var source = scientificNodeForStage(program.scientificBranch, stage);
+        if (!source) return;
+        var producer = source.producer && typeof source.producer === "object"
+          ? source.producer
+          : {};
+        var producerIdentity = [producer.repository, producer.git_sha].filter(Boolean).join(" @ ");
+        node.execution = source.status === "CANNOT_COMPLETE" ? "FAILED" : (source.status || "UNREPORTED");
+        node.outputOrigin = source.output_origin || "UNREPORTED";
+        node.resultBasis = source.status === "COMPLETE" ? "NATIVE PRODUCER ARTIFACT" : "MISSING";
+        node.runtime = producerIdentity || source.module_id || scientificModuleId(stage);
+        node.reason = source.reason_code || null;
+        node.metadata.presentationStatus = source.status || "UNREPORTED";
+        node.metadata.outputOrigin = source.output_origin || "UNREPORTED";
+        node.metadata.reasonCode = source.reason_code || null;
+        node.metadata.terminalMessage = source.message || null;
+        node.metadata.inputRef = source.input_ref || null;
+        node.metadata.inputHash = source.input_hash || null;
+        node.metadata.outputRef = source.output_ref || null;
+        node.metadata.outputHash = source.output_hash || null;
+        node.metadata.durationMs = source.duration_ms;
+        node.metadata.exitCode = source.exit_code;
+        node.metadata.producer = producer;
+        node.metadata.qualifiers = [];
+        node.metadata.warnings = source.message ? [source.message] : [];
+      }
+
       function bindStage(stage) {
         var httpMode = BOOT.mode === "http";
         state.nodes.forEach(function (node) {
@@ -713,6 +854,7 @@
             node.metadata.displayMetricNote = program.displayMetricNote || null;
           }
           applyBackendStageTruth(node, stage);
+          applyScientificNodeTruth(node, stage, program);
           // When a real station produced this record, its verbatim output rides along.
           // The payload never overwrites execution status or a failure/skip reason;
           // provenance labels upgrade only for records that actually resolved.
@@ -1057,7 +1199,9 @@
         var interaction = state.previewId === node.id ? "SELECTED + PREVIEWED" : "SELECTED";
         var payloadSection = "";
         if (node.metadata.stationPayload) {
-          payloadSection = httpMode
+          payloadSection = state.scientificSnapshot
+            ? '<details class="inspector-section" open data-inspector-section="station-artifact"><summary>Native producer artifact</summary><p class="micro">Exact producer field names and values are shown below. This includes native <span class="mono">simulated_*</span> clinical fields; the browser does not rename or rewrite the stored artifact.</p><pre class="mono native-artifact" data-native-artifact="true">' + escapeHTML(JSON.stringify(node.metadata.stationPayload, null, 2)) + "</pre></details>"
+            : httpMode
             ? '<details class="inspector-section" data-inspector-section="station-artifact"><summary>Native station artifact</summary><p class="micro">The complete module payload is retained unchanged and bound to this run by hash. Technical field names are omitted from the judging presentation; the readable interpretation above is display-only.</p></details>'
             : '<details class="inspector-section" open><summary>Station output (verbatim)</summary><p class="micro">Key names are the station’s own honesty contract; nothing is renamed for display, and score is not a probability of approval.</p><pre class="mono" style="overflow:auto;max-height:260px;background:#f0eee5;padding:9px;border-radius:8px;font-size:9px;white-space:pre-wrap;">' + escapeHTML(JSON.stringify(node.metadata.stationPayload, null, 2)) + "</pre></details>";
         }
@@ -1076,8 +1220,24 @@
           if (node.metadata.displayMetricBasis === "REPRESENTATIVE_DEMO_SCENARIO_V1") {
             liveDefinition = (definition ? definition.label + " · " + definition.unit + ". " : "") + "Representative branch value for demo comparison; not a native module output. The native artifact remains attached unchanged.";
           }
-          var interpretability = node.metadata.stationPayload && node.metadata.stationPayload.interpretability;
+          var interpretability = node.metadata.stationPayload && (
+            node.metadata.stationPayload.interpretability ||
+            (node.metadata.stationPayload.cards && node.metadata.stationPayload.cards.interpretability)
+          );
           var readableInterpretability = renderInterpretability(interpretability);
+          var scientificTruth = state.scientificSnapshot
+            ? '<div class="status-card"><span>Producer terminal status</span><strong>' + escapeHTML(node.metadata.presentationStatus || "UNREPORTED") + "</strong></div>"
+            : "";
+          var scientificAudit = state.scientificSnapshot
+            ? '<details class="inspector-section" open data-inspector-section="scientific-lineage"><summary>Artifact lineage & hashes</summary><ul>' +
+              "<li>Input ref: <span class=\"mono\">" + escapeHTML(node.metadata.inputRef || "not supplied") + "</span></li>" +
+              "<li>Input hash: <span class=\"mono\">" + escapeHTML(node.metadata.inputHash || "not supplied") + "</span></li>" +
+              "<li>Output ref: <span class=\"mono\">" + escapeHTML(node.metadata.outputRef || "not supplied") + "</span></li>" +
+              "<li>Output hash: <span class=\"mono\">" + escapeHTML(node.metadata.outputHash || "not supplied") + "</span></li>" +
+              "<li>Producer: <span class=\"mono\">" + escapeHTML(JSON.stringify(node.metadata.producer || {})) + "</span></li>" +
+              "<li>Duration / exit: " + escapeHTML(node.metadata.durationMs === null || node.metadata.durationMs === undefined ? "not supplied" : node.metadata.durationMs + " ms") + " / " + escapeHTML(node.metadata.exitCode === null || node.metadata.exitCode === undefined ? "not supplied" : node.metadata.exitCode) + "</li>" +
+              "</ul></details>"
+            : "";
 
           elements.inspectorHeading.textContent = node.label;
           elements.inspectorSubtitle.textContent = node.stage + " · " + node.id;
@@ -1091,11 +1251,13 @@
               '<div class="status-card"><span>UI freshness</span><strong>' + escapeHTML(state.freshness.toUpperCase()) + "</strong></div>" +
               '<div class="status-card"><span>Stage result</span><strong>' + escapeHTML(node.metadata.presentationStatus || node.execution || "UNREPORTED") + "</strong></div>" +
               '<div class="status-card"><span>Display metric basis</span><strong>' + escapeHTML(String(node.metadata.displayMetricBasis || "NATIVE_DERIVED").replace(/_/g, " ")) + "</strong></div>" +
+              scientificTruth +
             "</div>" +
             '<div class="primary-result"><span>Active display value</span><strong>' + escapeHTML(value) + '</strong><p>' + escapeHTML(liveDefinition) + " Uncertainty: " + escapeHTML(judgeFacingText(node.uncertainty || "not supplied")) + ".</p></div>" +
             readableInterpretability +
-            '<details class="inspector-section" open><summary>Run qualifications</summary><p><strong>Reason:</strong> ' + escapeHTML(judgeFacingText(node.reason || "No stage reason code reported.")) + '</p><p><strong>Qualifiers:</strong> ' + escapeHTML(judgeFacingText(qualifiers.length ? qualifiers.join(" · ") : "none reported")) + '</p><p><strong>Warnings:</strong> ' + escapeHTML(judgeFacingText(visibleWarnings.length ? visibleWarnings.join(" · ") : "none reported")) + "</p></details>" +
-            '<details class="inspector-section"><summary>Lineage & audit</summary><ul><li>Parent: ' + escapeHTML(parent ? parent.label : "none · root") + "</li><li>Direct descendants: " + childCount + "</li><li>Output origin: " + escapeHTML(origin) + "</li><li>Timestamp: " + escapeHTML(state.lastUpdated || "awaiting update") + "</li><li>Hash: " + escapeHTML(program ? program.hash : "unreported") + "</li></ul></details>" +
+            '<details class="inspector-section" open><summary>Run qualifications</summary><p><strong>Reason code:</strong> ' + escapeHTML(node.reason || "No stage reason code reported.") + '</p><p><strong>Terminal message:</strong> ' + escapeHTML(node.metadata.terminalMessage || "No terminal message reported.") + '</p><p><strong>Qualifiers:</strong> ' + escapeHTML(judgeFacingText(qualifiers.length ? qualifiers.join(" · ") : "none reported")) + '</p><p><strong>Warnings:</strong> ' + escapeHTML(judgeFacingText(visibleWarnings.length ? visibleWarnings.join(" · ") : "none reported")) + "</p></details>" +
+            scientificAudit +
+            '<details class="inspector-section"><summary>Lineage & audit</summary><ul><li>Parent: ' + escapeHTML(parent ? parent.label : "none · root") + "</li><li>Direct descendants: " + childCount + "</li><li>Output origin: " + escapeHTML(origin) + "</li><li>Timestamp: " + escapeHTML(state.lastUpdated || "awaiting update") + "</li><li>Hash: " + escapeHTML(node.metadata.outputHash || (program ? program.hash : "unreported")) + "</li></ul></details>" +
             payloadSection;
           return;
         }
@@ -1205,7 +1367,191 @@
       // null (missing shelf), never undefined, or dominates()/renderParetoPlot misbehave.
       var WIRE_METRIC_KEYS = ["boldness", "evidence", "plausibility", "rnpv", "positive", "impact", "recruit", "duration", "screens", "risk", "support", "occupancy", "convergence", "tractability_fit"];
 
+      function finiteNumber(value) {
+        return typeof value === "number" && Number.isFinite(value) ? value : null;
+      }
+
+      function normalizedScale(value, maximum) {
+        var number = finiteNumber(value);
+        if (number === null) return null;
+        return number >= 0 && number <= 1 ? number * maximum : number;
+      }
+
+      function dollarsToMillions(value) {
+        var number = finiteNumber(value);
+        return number === null ? null : Math.round(number / 10000) / 100;
+      }
+
+      function scientificHypothesisProjection(branch) {
+        var node = scientificNodeForStage(branch, "hypothesis");
+        var artifact = node && node.artifact && typeof node.artifact === "object"
+          ? node.artifact
+          : {};
+        var document = artifact.hypothesis && typeof artifact.hypothesis === "object"
+          ? artifact.hypothesis
+          : {};
+        var hypothesis = document.hypothesis && typeof document.hypothesis === "object"
+          ? document.hypothesis
+          : {};
+        var cards = artifact.cards && typeof artifact.cards === "object" ? artifact.cards : {};
+        var firstCard = Array.isArray(cards.hypotheses) && cards.hypotheses.length
+          ? cards.hypotheses[0]
+          : {};
+        var scores = hypothesis.scores && typeof hypothesis.scores === "object"
+          ? hypothesis.scores
+          : (firstCard.scores && typeof firstCard.scores === "object" ? firstCard.scores : {});
+        var articulation = hypothesis.articulation && typeof hypothesis.articulation === "object"
+          ? hypothesis.articulation
+          : {};
+        var statement = articulation.statement || articulation.mechanism || null;
+        var focus = branch.focus && typeof branch.focus === "object" ? branch.focus : {};
+        var fallback = focus.display_label || focus.name || branch.branch_id || "Scientific branch";
+        return {
+          id: scientificCandidateId(branch) || branch.branch_id,
+          label: statement || fallback,
+          short: (focus.display_label || fallback) + (statement ? " · " + statement : ""),
+          publicWhy: articulation.novel_because || statement || "Native hypothesis artifact; inspect the producer output and lineage.",
+          metrics: {
+            boldness: normalizedScale(scores.novelty, 10),
+            evidence: normalizedScale(scores.support, 100),
+            plausibility: normalizedScale(scores.testability, 100)
+          },
+          uncertainty: cards.interpretability && cards.interpretability.uncertainty
+            ? cards.interpretability.uncertainty.method || "native hypothesis uncertainty attached"
+            : "native hypothesis uncertainty not summarized"
+        };
+      }
+
+      function scientificRoiProjection(branch) {
+        var node = scientificNodeForStage(branch, "roi");
+        var artifact = node && node.artifact && typeof node.artifact === "object"
+          ? node.artifact
+          : {};
+        var payload = artifact.payload && typeof artifact.payload === "object" ? artifact.payload : artifact;
+        var summary = payload.summary && typeof payload.summary === "object" ? payload.summary : {};
+        var p10 = dollarsToMillions(summary.p10_rnpv);
+        var p50 = dollarsToMillions(summary.p50_rnpv);
+        var p90 = dollarsToMillions(summary.p90_rnpv);
+        var uncertainty = p10 !== null && p90 !== null
+          ? "rNPV P10–P90: " + metricCell(p10, "$", "M") + " to " + metricCell(p90, "$", "M")
+          : "native ROI uncertainty not summarized";
+        return {
+          rnpv: p50,
+          positive: normalizedScale(summary.probability_positive_rnpv, 100),
+          impact: null,
+          uncertainty: uncertainty
+        };
+      }
+
+      function scientificStationPayloads(branch) {
+        var payloads = {};
+        ["hypothesis", "roi", "recruitability", "simulation"].forEach(function (stageId) {
+          var node = scientificNodeForStage(branch, stageId);
+          if (node && node.artifact && typeof node.artifact === "object") {
+            payloads[stageId] = node.artifact;
+          }
+        });
+        return payloads;
+      }
+
+      function translateScientificWire(ws) {
+        var branches = Array.isArray(ws.branches) ? ws.branches : [];
+        var biomarkers = branches.map(function (branch, index) {
+          var focus = branch.focus && typeof branch.focus === "object" ? branch.focus : {};
+          return {
+            slot: index,
+            id: "bio-slot-" + index,
+            label: focus.display_label || focus.name || focus.thing_id || branch.branch_id,
+            summary: (focus.kind === "process" ? "Mechanistic/PD readout focus" : "Biomarker focus") + " selected from producer evidence; " + (focus.support_count || 0) + " supporting finding(s).",
+            metrics: { exploration: null, evidence: null, pursuit: null },
+            nativeMetrics: { exploration: null, evidence: null, pursuit: null },
+            uncertainty: "Focus selection preserves mapper finding and link IDs; no display score is imputed.",
+            displayMetricBasis: null,
+            displayMetricNote: null,
+            stationPayload: null,
+            scientificFocus: focus,
+            branchId: branch.branch_id
+          };
+        });
+        var programs = branches.map(function (branch, index) {
+          var hypothesis = scientificHypothesisProjection(branch);
+          var roi = scientificRoiProjection(branch);
+          var clinicalNode = scientificNodeForStage(branch, "recruitability");
+          var simulationNode = scientificNodeForStage(branch, "simulation");
+          var metrics = {
+            boldness: hypothesis.metrics.boldness,
+            evidence: hypothesis.metrics.evidence,
+            plausibility: hypothesis.metrics.plausibility,
+            rnpv: roi.rnpv,
+            positive: roi.positive,
+            impact: roi.impact,
+            recruit: null,
+            duration: null,
+            screens: null,
+            risk: null,
+            support: null,
+            occupancy: null,
+            convergence: null,
+            tractability_fit: null
+          };
+          var program = {
+            id: branch.branch_id || "scientific-branch-" + (index + 1),
+            candidateId: hypothesis.id,
+            lane: index,
+            biomarkerSlot: index,
+            hypothesisSlot: 0,
+            hypothesisNodeId: "hyp-slot-" + index,
+            roiNodeId: "roi-slot-" + index,
+            recruitNodeId: "recruitability-slot-" + index,
+            simulationNodeId: "simulation-slot-" + index,
+            label: hypothesis.label,
+            short: hypothesis.short,
+            metrics: metrics,
+            nativeMetrics: Object.assign({}, metrics),
+            uncertainty: roi.uncertainty,
+            hypothesisUncertainty: hypothesis.uncertainty,
+            recruitmentUncertainty: "native clinical output not summarized",
+            tractabilityUncertainty: "Native dossier is categorical; no scalar tractability score is imputed.",
+            displayMetricBasis: null,
+            displayMetricNote: null,
+            publicWhy: hypothesis.publicWhy,
+            roiFailed: !scientificNodeForStage(branch, "roi") || scientificNodeForStage(branch, "roi").status !== "COMPLETE",
+            recruitFailed: !clinicalNode || clinicalNode.status !== "COMPLETE",
+            overflowRnpv: false,
+            notAmenable: Boolean(simulationNode && simulationNode.artifact && simulationNode.artifact.verdict === "not_tractable"),
+            revision: "scientific-packet-v1",
+            hash: (scientificNodeForStage(branch, "hypothesis") || {}).output_hash || "unhashed",
+            stationPayloads: scientificStationPayloads(branch),
+            scientificBranch: branch,
+            scientificNodes: branch.nodes || {},
+            branchStatus: branch.status
+          };
+          applyStationDerivations(program);
+          program.nativeMetrics = Object.assign({}, program.metrics);
+          return program;
+        });
+        var stageRows = {};
+        (ws.stages || []).forEach(function (stage) {
+          if (!stage || !stage.stage_id) return;
+          var mapped = Object.assign({}, stage, { stage_id: scientificStageId(stage.stage_id) });
+          stageRows[mapped.stage_id] = mapped;
+        });
+        var requestedLanes = Math.max(
+          state.snapshot && Number.isInteger(state.snapshot.biomarkers) ? state.snapshot.biomarkers : 0,
+          branches.length
+        );
+        return {
+          biomarkers: biomarkers,
+          programs: programs,
+          stageRows: stageRows,
+          requestedLanes: requestedLanes,
+          biomarkerShortfall: Math.max(0, requestedLanes - biomarkers.length),
+          hypothesisShortfall: Math.max(0, requestedLanes - programs.length)
+        };
+      }
+
       function translateWire(ws) {
+        if (isScientificSnapshot(ws)) return translateScientificWire(ws);
         var biomarkers = (ws.biomarkers || []).map(function (item) {
           var nativeMetrics = Object.assign({}, item.metrics || {});
           var displayMetrics = item.display_metric_basis === "REPRESENTATIVE_DEMO_SCENARIO_V1" && item.display_metrics
@@ -1279,12 +1625,53 @@
         };
       }
 
+      function applyScientificSnapshotChrome(ws) {
+        state.representativeDemo =
+          ws.representative_demo === true && ws.presentation_mode === "REPRESENTATIVE_DEMO";
+        state.scientificPacketExcludesRepresentativeValues =
+          ws.scientific_packet_excludes_representative_values === true;
+        state.presentationMode = ws.presentation_mode || null;
+        state.executionMode = ws.execution_mode || null;
+        elements.representativeWatermark.hidden = !state.representativeDemo;
+        elements.representativeWatermark.textContent = state.representativeDemo
+          ? (ws.watermark || "REPRESENTATIVE DEMO VALUES")
+          : "";
+        document.getElementById("scenario-profile").disabled = true;
+        document.getElementById("highlander-mode-description").textContent = "Server-native producer packet comparison";
+        document.getElementById("highlander-mode-chip").textContent = "SERVER HIGHLANDER";
+        document.getElementById("highlander-mode-chip").classList.remove("mock");
+        document.getElementById("highlander-server-chip").textContent = "RFC 8785 PACKETS";
+        document.getElementById("comparison-mode-badge").textContent = "server result";
+        document.getElementById("gap-confirm-copy").textContent = "I acknowledge terminal producer failures remain visible and incomparable. Run the pinned server Highlander consumer.";
+        document.getElementById("module-dialog-summary").textContent = "This scientific run exposes exact per-branch producer artifacts, refs, hashes, origins, terminal reasons, and the server Highlander result.";
+      }
+
       function ingestSnapshot(ws) {
         var hadPrograms = Boolean(state.runData && state.runData.programs && state.runData.programs.length);
+        var scientific = isScientificSnapshot(ws);
+        var rebuildScientificScaffold = scientific && state.snapshot && state.snapshot.hypotheses !== 1;
+        state.scientificSnapshot = scientific;
+        if (scientific) applyScientificSnapshotChrome(ws);
+        else {
+          state.representativeDemo = false;
+          elements.representativeWatermark.hidden = true;
+          elements.representativeWatermark.textContent = "";
+        }
         state.runData = translateWire(ws);
+        if (rebuildScientificScaffold) {
+          state.snapshot = Object.freeze(Object.assign({}, state.snapshot, {
+            biomarkers: Math.max(state.snapshot.biomarkers, state.runData.biomarkers.length),
+            hypotheses: 1
+          }));
+          state.runData.requestedLanes = state.snapshot.biomarkers;
+          state.runData.biomarkerShortfall = Math.max(0, state.snapshot.biomarkers - state.runData.biomarkers.length);
+          state.runData.hypothesisShortfall = Math.max(0, state.snapshot.biomarkers - state.runData.programs.length);
+          buildScaffold();
+        }
         var stageIds = STAGES.map(function (stage) { return stage.id; });
         (ws.stages || []).forEach(function (stage) {
-          var index = stageIds.indexOf(stage.stage_id);
+          var mappedStageId = scientific ? scientificStageId(stage.stage_id) : stage.stage_id;
+          var index = stageIds.indexOf(mappedStageId);
           if (index === -1) return;
           var truth = normalizeStageTruth(stage, { execution: "QUEUED" });
           var status = truth.presentationStatus;
@@ -1294,9 +1681,30 @@
             status === "COMPLETE_WITH_WARNINGS" ? "warning" :
             status === "FAILED" ? "failed" : "queued";
           state.stageNotes[index] = stage.note || status.toLowerCase();
-          if (status === "RUNNING") markStagePending(stage.stage_id);
-          if (status === "COMPLETE" || status === "COMPLETE_WITH_WARNINGS" || status === "FAILED") bindStage(stage.stage_id);
+          if (status === "RUNNING") markStagePending(mappedStageId);
+          if (status === "COMPLETE" || status === "COMPLETE_WITH_WARNINGS" || status === "FAILED") bindStage(mappedStageId);
         });
+        if (scientific) {
+          var highlander = ws.highlander && typeof ws.highlander === "object" ? ws.highlander : {};
+          state.highlanderLaunched = highlander.launched === true;
+          state.highlanderResult = highlander.result && typeof highlander.result === "object" ? highlander.result : null;
+          state.highlanderResultHash = highlander.result_hash || null;
+          var packet = highlander.packet_snapshot;
+          if (packet && typeof packet === "object") {
+            state.packetSnapshot = packet.id || packet.snapshotId || state.packetSnapshot;
+          } else if (typeof packet === "string") {
+            state.packetSnapshot = packet;
+          }
+          if (state.highlanderResult && state.highlanderResult.snapshotId) {
+            state.packetSnapshot = state.highlanderResult.snapshotId;
+          }
+          document.getElementById("packet-snapshot").textContent = state.packetSnapshot || "awaiting server packet";
+          var highlanderNav = document.querySelector('[data-nav="highlander"]');
+          if (state.highlanderLaunched && highlanderNav) {
+            highlanderNav.disabled = false;
+            highlanderNav.classList.remove("locked");
+          }
+        }
         renderProgress();
         renderGraph();
         if (!hadPrograms && state.runData.programs.length) centerGraphOnActiveLineage();
@@ -1326,6 +1734,13 @@
         state.inspectorCollapsed = false;
         state.highlanderReady = false;
         state.highlanderLaunched = false;
+        state.highlanderLaunching = false;
+        state.highlanderResult = null;
+        state.highlanderResultHash = null;
+        state.scientificSnapshot = false;
+        state.representativeDemo = false;
+        elements.representativeWatermark.hidden = true;
+        elements.representativeWatermark.textContent = "";
         elements.gapConfirmInput.checked = false;
         var highlanderNav = document.querySelector('[data-nav="highlander"]');
         if (highlanderNav) {
@@ -1415,7 +1830,9 @@
       function renderReadiness() {
         var nonterminal = state.stageStates.filter(function (stage) { return stage === "queued" || stage === "running"; }).length;
         var programCount = state.runData ? state.runData.programs.length : 0;
-        var launchName = BOOT.mode === "http" ? "Open client-side comparison" : "Launch Highlander";
+        var launchName = state.scientificSnapshot
+          ? (state.highlanderLaunched ? "Open server Highlander result" : "Run server Highlander")
+          : (BOOT.mode === "http" ? "Open client-side comparison" : "Launch Highlander");
         if (!programCount) {
           elements.readinessState.textContent = "BLOCKED · no candidates";
           elements.packetCounts.innerHTML = '<span class="packet-count">0 complete</span><span class="packet-count">0 partial</span><span class="packet-count">0 blocked</span><span class="packet-count">no candidates</span>';
@@ -1432,13 +1849,19 @@
           elements.launchHighlander.textContent = launchName + " · blocked";
           return;
         }
-        elements.readinessState.textContent = "READY WITH TERMINAL GAPS · no nonterminal records";
-        elements.packetCounts.innerHTML = '<span class="packet-count">0 complete</span><span class="packet-count">' + programCount + ' partial</span><span class="packet-count">0 blocked</span><span class="packet-count">0 nonterminal</span>';
+        var completeCount = state.scientificSnapshot
+          ? state.runData.programs.filter(function (program) { return program.branchStatus === "COMPLETE"; }).length
+          : 0;
+        var blockedCount = state.scientificSnapshot ? programCount - completeCount : 0;
+        elements.readinessState.textContent = state.scientificSnapshot
+          ? "SERVER HIGHLANDER READY · terminal producer packets"
+          : "READY WITH TERMINAL GAPS · no nonterminal records";
+        elements.packetCounts.innerHTML = '<span class="packet-count">' + completeCount + ' complete</span><span class="packet-count">' + (state.scientificSnapshot ? 0 : programCount) + ' partial</span><span class="packet-count">' + blockedCount + ' blocked</span><span class="packet-count">0 nonterminal</span>';
         elements.gapConfirm.classList.add("visible");
         elements.launchHighlander.disabled = !elements.gapConfirmInput.checked;
         elements.launchHighlander.textContent = elements.gapConfirmInput.checked
           ? launchName + " →"
-          : (BOOT.mode === "http" ? "Acknowledge gaps to continue" : "Acknowledge gaps to launch");
+          : (state.scientificSnapshot ? "Acknowledge terminal packets to run" : (BOOT.mode === "http" ? "Acknowledge gaps to continue" : "Acknowledge gaps to launch"));
       }
 
       function resetDemo() {
@@ -1534,6 +1957,28 @@
         announce("Run creation failed. Inputs preserved; retry available.");
       }
 
+      function attachConfiguredRun(runId) {
+        if (BOOT.mode !== "http" || !runId) return;
+        var validation = validateSetup();
+        if (!validation.valid) {
+          submitFailed("Cannot attach until the visible setup fields are valid.");
+          return;
+        }
+        validation.biomarkerRange = [Number(document.getElementById("biomarker-low").value), Number(document.getElementById("biomarker-high").value)];
+        validation.hypothesisRange = [Number(document.getElementById("hypothesis-low").value), Number(document.getElementById("hypothesis-high").value)];
+        if (BOOT.launchMode === "scientific") validation.hypotheses = 1;
+        state.runData = {
+          biomarkers: [],
+          programs: [],
+          requestedLanes: validation.biomarkers * validation.hypotheses,
+          biomarkerShortfall: 0,
+          hypothesisShortfall: 0
+        };
+        enterRun(runId, validation);
+        elements.snapshotNote.textContent = "Attached read-only to backend run " + runId + ". No new run was created.";
+        startHttpRun(runId);
+      }
+
       function submitRun(event) {
         event.preventDefault();
         var validation = validateSetup();
@@ -1548,29 +1993,35 @@
         validateSetup();
 
         if (BOOT.mode === "http") {
-          var setupWire = {
-            clinical_indication: { submitted_text: validation.indication },
-            biomarker_exploration_range: {
-              lower: validation.biomarkerRange[0],
-              upper: validation.biomarkerRange[1]
-            },
-            maximum_biomarkers: validation.biomarkers,
-            maximum_literature_papers: validation.papers,
-            hypothesis_boldness_range: {
-              lower: validation.hypothesisRange[0],
-              upper: validation.hypothesisRange[1]
-            },
-            maximum_hypotheses_per_biomarker: validation.hypotheses
-          };
+          var setupWire = BOOT.launchMode === "scientific"
+            ? buildScientificSetup(validation)
+            : {
+              clinical_indication: { submitted_text: validation.indication },
+              biomarker_exploration_range: {
+                lower: validation.biomarkerRange[0],
+                upper: validation.biomarkerRange[1]
+              },
+              maximum_biomarkers: validation.biomarkers,
+              maximum_literature_papers: validation.papers,
+              hypothesis_boldness_range: {
+                lower: validation.hypothesisRange[0],
+                upper: validation.hypothesisRange[1]
+              },
+              maximum_hypotheses_per_biomarker: validation.hypotheses
+            };
           BOOT.http.createRun(setupWire).then(function (created) {
-            if (!created || !created.run || !created.run.run_id) {
+            var createdRunId = created && created.run && created.run.run_id
+              ? created.run.run_id
+              : (created && created.runId ? created.runId : null);
+            if (!createdRunId) {
               submitFailed("Backend responded without a run_id.");
               return;
             }
+            if (BOOT.launchMode === "scientific") validation.hypotheses = 1;
             state.runData = { biomarkers: [], programs: [], requestedLanes: validation.biomarkers * validation.hypotheses, biomarkerShortfall: 0, hypothesisShortfall: 0 };
             state.selectedProgramId = null;
-            enterRun(created.run.run_id, validation);
-            startHttpRun(created.run.run_id);
+            enterRun(createdRunId, validation);
+            startHttpRun(createdRunId);
           }).catch(function (error) {
             submitFailed("Run creation failed against " + BOOT.base + " (" + String(error && error.message) + ").");
           });
@@ -1617,6 +2068,14 @@
       }
 
       function programStatus(program) {
+        if (state.scientificSnapshot) {
+          var serverStatus = scientificComparisonStatus(state.highlanderResult, program.candidateId);
+          return serverStatus === "FRONTIER"
+            ? "non-dominated"
+            : serverStatus === "DOMINATED"
+              ? "dominated"
+              : "incomparable";
+        }
         var vector = paretoVector(program);
         if (![vector.roi, vector.recruitability, vector.simulation].every(Number.isFinite)) return "incomparable";
         var dominated = state.runData.programs.some(function (other) {
@@ -1631,11 +2090,38 @@
           var statusOrder = { "non-dominated": 0, incomparable: 1, dominated: 2 };
           var statusDifference = statusOrder[programStatus(a)] - statusOrder[programStatus(b)];
           if (statusDifference) return statusDifference;
+          if (state.scientificSnapshot) return String(a.candidateId || a.id).localeCompare(String(b.candidateId || b.id));
           if (state.scenario === "speed") return (b.metrics.recruit || -1) - (a.metrics.recruit || -1);
           if (state.scenario === "capital") return (b.metrics.positive || -1) - (a.metrics.positive || -1);
           return (b.metrics.plausibility || -1) - (a.metrics.plausibility || -1);
         });
         return copy;
+      }
+
+      function serverStatusLabel(program) {
+        return scientificComparisonStatus(state.highlanderResult, program.candidateId) || "AWAITING_SERVER_HIGHLANDER";
+      }
+
+      function serverCandidateObjectives(program) {
+        var candidate = scientificHighlanderCandidate(state.highlanderResult, program.candidateId);
+        if (!candidate || !Array.isArray(candidate.observations)) return [];
+        return candidate.observations.map(function (observation) {
+          return {
+            id: observation.objectiveId || "unreported objective",
+            value: observation.rawValue,
+            unit: observation.unit || "",
+            direction: observation.direction || "",
+            basis: observation.evidenceBasis || "UNREPORTED"
+          };
+        });
+      }
+
+      function formatServerObjectives(program) {
+        var objectives = serverCandidateObjectives(program);
+        if (!objectives.length) return "No comparable server objectives returned.";
+        return objectives.map(function (objective) {
+          return objective.id + " = " + JSON.stringify(objective.value) + (objective.unit ? " " + objective.unit : "") + " · " + objective.direction + " · " + objective.basis;
+        }).join("; ");
       }
 
       function metricCell(value, prefix, suffix) {
@@ -1644,7 +2130,57 @@
         return (prefix || "") + value + (suffix || "");
       }
 
+      function renderServerHighlanderResult() {
+        if (!state.scientificSnapshot) {
+          elements.serverHighlanderResult.hidden = true;
+          elements.serverHighlanderResult.innerHTML = "";
+          return;
+        }
+        elements.serverHighlanderResult.hidden = false;
+        var result = state.highlanderResult;
+        if (!result) {
+          elements.serverHighlanderResult.innerHTML =
+            '<div class="card-head"><div><h2>Server Highlander result</h2><p>No browser frontier is substituted.</p></div><span class="badge skipped">awaiting launch</span></div>' +
+            '<p class="micro">Terminal producer packets are ready. Launch the pinned server consumer to create the comparison snapshot.</p>';
+          return;
+        }
+        var frontier = Array.isArray(result.frontier) ? result.frontier : [];
+        var dominated = Array.isArray(result.dominated) ? result.dominated : [];
+        var incomparable = Array.isArray(result.incomparable) ? result.incomparable : [];
+        var action = result.nextEvidenceAction && typeof result.nextEvidenceAction === "object"
+          ? result.nextEvidenceAction
+          : null;
+        var actionHtml = action
+          ? '<div class="next-evidence-action" data-server-next-evidence-action="true"><span class="eyebrow">Producer-grounded next evidence action</span><strong>' + escapeHTML(action.actionType || "action") + " · " + escapeHTML(action.target || "unreported target") + '</strong><p>' + escapeHTML(action.description || "No description supplied.") + '</p><p class="micro">Producer: ' + escapeHTML(action.producerModuleId || "unreported") + " · output " + escapeHTML(action.producerOutputSha256 || "unreported") + " · candidates " + escapeHTML(Array.isArray(action.candidateIds) ? action.candidateIds.join(", ") : "unreported") + "</p></div>"
+          : '<p class="micro">No producer emitted a grounded next evidence action.</p>';
+        elements.serverHighlanderResult.innerHTML =
+          '<div class="card-head"><div><h2>Server Highlander result</h2><p>Pareto membership comes from the pinned packet consumer, not browser display values.</p></div><span class="badge complete">server native</span></div>' +
+          '<div class="server-result-grid">' +
+            '<div><span>Frontier</span><strong data-server-frontier="true">' + escapeHTML(frontier.length ? frontier.join(", ") : "none") + "</strong></div>" +
+            '<div><span>Dominated</span><strong>' + escapeHTML(dominated.length ? dominated.join(", ") : "none") + "</strong></div>" +
+            '<div><span>Incomparable</span><strong>' + escapeHTML(incomparable.length ? incomparable.map(function (item) { return item.candidateId; }).join(", ") : "none") + "</strong></div>" +
+          "</div>" +
+          '<p class="micro mono">Packet: ' + escapeHTML(state.packetSnapshot || "unreported") + " · request/result hash: " + escapeHTML(state.highlanderResultHash || "unreported") + " · result snapshot: " + escapeHTML(result.snapshotId || "unreported") + "</p>" +
+          actionHtml;
+      }
+
       function renderScenario() {
+        if (state.scientificSnapshot) {
+          var result = state.highlanderResult;
+          var policy = result && result.objectivePolicy && typeof result.objectivePolicy === "object"
+            ? result.objectivePolicy
+            : null;
+          elements.scenarioMeta.innerHTML = '<strong>Server objective policy</strong><br>' + escapeHTML(policy ? (policy.policyId || result.objectivePolicyId || "unreported") : "awaiting server Highlander") + '<br><span class="muted">Presentation controls are disabled for scientific comparison.</span>';
+          elements.weightList.innerHTML = "";
+          var objectives = policy && Array.isArray(policy.objectives) ? policy.objectives : [];
+          objectives.forEach(function (objective) {
+            var row = document.createElement("div");
+            row.className = "weight-row";
+            row.innerHTML = '<span>' + escapeHTML(objective.objectiveId || "unreported") + " · " + escapeHTML(objective.direction || "unreported") + '</span><span class="mono">server rule</span>';
+            elements.weightList.appendChild(row);
+          });
+          return;
+        }
         var scenario = SCENARIOS[state.scenario];
         elements.scenarioMeta.innerHTML = '<strong>' + escapeHTML(scenario.name + " " + scenario.version) + '</strong><br>' + escapeHTML(scenario.description) + '<br><span class="muted">Author/source: ' + escapeHTML(scenario.author) + " · " + escapeHTML(scenario.timestamp) + "</span>";
         elements.weightList.innerHTML = "";
@@ -1680,7 +2216,7 @@
           button.className = "program-item" + (program.id === state.selectedProgramId ? " selected" : "");
           var status = programStatus(program);
           button.dataset.programId = program.id;
-          button.innerHTML = "<strong>" + escapeHTML(program.short) + "</strong><span>" + escapeHTML(status) + " · packet r1 · selection is not a winner</span>";
+          button.innerHTML = "<strong>" + escapeHTML(program.short) + "</strong><span>" + escapeHTML(state.scientificSnapshot ? serverStatusLabel(program) : status) + " · " + escapeHTML(state.scientificSnapshot ? program.candidateId : "packet r1") + " · selection is not a winner</span>";
           button.addEventListener("click", function () { selectProgram(program.id); });
           elements.programList.appendChild(button);
         });
@@ -1704,15 +2240,18 @@
           var row = document.createElement("tr");
           var status = programStatus(program);
           row.dataset.status = status;
+          var scientificObjectives = state.scientificSnapshot
+            ? '<br><span class="micro muted" data-server-objectives="true">' + escapeHTML(formatServerObjectives(program)) + "</span>"
+            : "";
           row.innerHTML =
-            '<td><button class="table-program" type="button">' + escapeHTML(program.short) + '</button><br><span class="micro muted">' + escapeHTML(program.uncertainty) + "</span></td>" +
+            '<td><button class="table-program" type="button">' + escapeHTML(program.short) + '</button><br><span class="micro muted">' + escapeHTML(program.uncertainty) + "</span>" + scientificObjectives + "</td>" +
             "<td>" + metricCell(program.metrics.rnpv, "$", "M") + (program.overflowRnpv ? '<br><span class="badge failed">above display domain</span>' : "") + "</td>" +
             "<td>" + metricCell(program.metrics.positive, "", "%") + "</td>" +
             "<td>" + metricCell(program.metrics.recruit, "", "/100") + "</td>" +
             "<td>" + metricCell(program.metrics.duration, "", " mo") + "</td>" +
             "<td>" + metricCell(program.metrics.plausibility, "", "/100") + "</td>" +
             "<td>" + simulationComparisonCell(program) + "</td>" +
-            "<td><strong>" + escapeHTML(status) + "</strong></td>";
+            "<td><strong>" + escapeHTML(state.scientificSnapshot ? serverStatusLabel(program) : status) + "</strong></td>";
           row.querySelector(".table-program").addEventListener("click", function () { selectProgram(program.id); });
           elements.comparisonBody.appendChild(row);
         });
@@ -1720,6 +2259,41 @@
 
       function renderParetoPlot() {
         var svg = elements.paretoPlot;
+        if (state.scientificSnapshot) {
+          document.getElementById("pareto-caption").innerHTML = "<strong>Server-native Pareto set:</strong> categorical membership from the pinned Highlander result. Positions below separate frontier, dominated, and incomparable packets; they do not encode browser-computed scientific magnitude.";
+          svg.setAttribute("data-pareto-dimensions", "server-native-objective-policy");
+          svg.setAttribute("aria-label", "Server-native Highlander Pareto membership");
+          svg.innerHTML = '<line class="pareto-axis" x1="70" y1="210" x2="630" y2="210"/><text class="pareto-axis-label" x="150" y="35" text-anchor="middle">FRONTIER</text><text class="pareto-axis-label" x="350" y="35" text-anchor="middle">DOMINATED</text><text class="pareto-axis-label" x="550" y="35" text-anchor="middle">INCOMPARABLE / AWAITING</text>';
+          var columnCounts = { "non-dominated": 0, dominated: 0, incomparable: 0 };
+          state.runData.programs.forEach(function (program, index) {
+            var status = programStatus(program);
+            var columnX = status === "non-dominated" ? 150 : status === "dominated" ? 350 : 550;
+            var rowIndex = columnCounts[status] || 0;
+            columnCounts[status] = rowIndex + 1;
+            var y = 70 + rowIndex * 45;
+            var circle = document.createElementNS(svg.namespaceURI, "circle");
+            circle.setAttribute("cx", String(columnX));
+            circle.setAttribute("cy", String(y));
+            circle.setAttribute("r", program.id === state.selectedProgramId ? "10" : "8");
+            circle.setAttribute("class", "plot-point " + status + (program.id === state.selectedProgramId ? " selected" : ""));
+            circle.setAttribute("data-plan-id", program.id);
+            circle.setAttribute("data-server-status", serverStatusLabel(program));
+            circle.setAttribute("tabindex", "0");
+            circle.setAttribute("role", "button");
+            circle.setAttribute("aria-label", "Candidate " + program.candidateId + "; server status " + serverStatusLabel(program));
+            circle.addEventListener("click", function () { selectProgram(program.id); });
+            svg.appendChild(circle);
+            var label = document.createElementNS(svg.namespaceURI, "text");
+            label.setAttribute("x", String(columnX + 16));
+            label.setAttribute("y", String(y + 3));
+            label.setAttribute("class", "plot-server-label");
+            label.textContent = String(index + 1) + " · " + program.candidateId;
+            svg.appendChild(label);
+          });
+          return;
+        }
+        document.getElementById("pareto-caption").innerHTML = '<strong>Three-dimensional Pareto view:</strong> P50 rNPV × recruitability × simulation / tractability. Each numbered point is one plan. Plans with identical vectors fan slightly around their shared coordinate. <span class="pareto-frontier-key">Nominal frontier projection</span> The line is a projected guide through complete non-dominated records, not a frontier surface or decision threshold. Missing values remain on a separate shelf. The current RA demo uses a labeled representative tractability fit on the Z axis; its native cached dossier remains shared across plans.';
+        svg.setAttribute("data-pareto-dimensions", "roi,recruitability,simulation");
         svg.innerHTML = '<g class="pareto-depth-grid" aria-hidden="true"><line class="back-edge" x1="145" y1="135" x2="645" y2="135"/><line class="back-edge" x1="145" y1="135" x2="145" y2="15"/><line class="back-edge" x1="70" y1="60" x2="570" y2="60"/><line class="back-edge" x1="70" y1="60" x2="145" y2="15"/><line class="back-edge" x1="570" y1="180" x2="645" y2="135"/><line class="back-edge" x1="570" y1="180" x2="570" y2="60"/><line class="back-edge" x1="570" y1="60" x2="645" y2="15"/><line class="back-edge" x1="645" y1="135" x2="645" y2="15"/><line class="back-edge" x1="145" y1="15" x2="645" y2="15"/></g><line class="pareto-axis" x1="70" y1="180" x2="570" y2="180"/><line class="pareto-axis" x1="70" y1="180" x2="70" y2="60"/><line class="pareto-axis" x1="70" y1="180" x2="145" y2="135"/><text class="pareto-axis-label" x="320" y="207" text-anchor="middle">P50 rNPV · $M modeled →</text><text class="pareto-axis-label" x="18" y="120" transform="rotate(-90 18 120)" text-anchor="middle">Recruitability /100 →</text><text class="pareto-axis-label" x="89" y="151" transform="rotate(-31 89 151)">Simulation / tractability /100 →</text><line class="pareto-shelf" x1="70" y1="230" x2="645" y2="230"/><text x="70" y="244" font-size="7" fill="#7a817b">missing objective shelf · not plotted as zero</text><polyline id="nominal-pareto-frontier" class="pareto-frontier-line" data-pareto-frontier-line="nominal-projection" points="" role="img" aria-label="Nominal Pareto frontier projection"></polyline><text id="pareto-selected-plan" class="pareto-selection-label" x="350" y="28"></text>';
         var planCount = state.runData.programs.length;
         var plottedPrograms = state.runData.programs.map(function (program, index) {
@@ -1827,10 +2401,35 @@
         return state.runData.programs.find(function (program) { return program.id === state.selectedProgramId; }) || state.runData.programs[0] || null;
       }
 
+      function renderScientificProgramDetail(program) {
+        var candidate = scientificHighlanderCandidate(state.highlanderResult, program.candidateId);
+        var status = serverStatusLabel(program);
+        var qualifiers = candidate && Array.isArray(candidate.qualifiers) ? candidate.qualifiers : [];
+        var incomparable = candidate && Array.isArray(candidate.incomparableReasons)
+          ? candidate.incomparableReasons
+          : [];
+        var nodeRows = ["hypothesis", "recruitability", "simulation", "roi"].map(function (stageId) {
+          var node = scientificNodeForStage(program.scientificBranch, stageId);
+          if (!node) return "<li>" + escapeHTML(stageId) + ": not returned</li>";
+          return "<li><strong>" + escapeHTML(node.module_id || scientificModuleId(stageId)) + ":</strong> " + escapeHTML(node.status || "UNREPORTED") + " · " + escapeHTML(node.output_origin || "UNREPORTED") + " · " + escapeHTML(node.reason_code || "no reason code") + "<br><span class=\"mono\">" + escapeHTML(node.output_hash || "no output hash") + "</span></li>";
+        }).join("");
+        elements.programDetail.innerHTML =
+          '<div class="detail-callout"><strong>' + escapeHTML(program.candidateId + " · " + status) + '</strong><p>' + escapeHTML(program.publicWhy) + "</p></div>" +
+          '<div class="objective-vector"><div class="objective"><span>Server status</span><strong>' + escapeHTML(status) + '</strong></div><div class="objective"><span>Branch status</span><strong>' + escapeHTML(program.branchStatus || "UNREPORTED") + '</strong></div><div class="objective"><span>Output hash</span><strong class="mono hash-clip">' + escapeHTML(program.hash) + "</strong></div></div>" +
+          '<div class="detail-sections"><details open><summary>Server objective observations</summary><p>' + escapeHTML(formatServerObjectives(program)) + "</p><p><strong>Qualifiers:</strong> " + escapeHTML(qualifiers.length ? qualifiers.join(" · ") : "none reported") + "</p><p><strong>Incomparable reasons:</strong> " + escapeHTML(incomparable.length ? incomparable.join(" · ") : "none reported") + "</p></details>" +
+          "<details open><summary>Producer terminal packets</summary><ul>" + nodeRows + "</ul></details>" +
+          '<details><summary>Comparison provenance</summary><ul><li>Packet snapshot: <span class="mono">' + escapeHTML(state.packetSnapshot || "unreported") + '</span></li><li>Result hash: <span class="mono">' + escapeHTML(state.highlanderResultHash || "unreported") + '</span></li><li>Representative values excluded from scientific packet: ' + escapeHTML(state.scientificPacketExcludesRepresentativeValues ? "yes" : "not confirmed") + "</li></ul></details></div>";
+        document.getElementById("open-source-node").dataset.nodeId = program.hypothesisNodeId;
+      }
+
       function renderProgramDetail() {
         var program = selectedProgram();
         if (!program) {
           elements.programDetail.innerHTML = '<div class="state-warning">No candidates exist, so no program can be selected.</div>';
+          return;
+        }
+        if (state.scientificSnapshot) {
+          renderScientificProgramDetail(program);
           return;
         }
         var status = programStatus(program);
@@ -1865,6 +2464,7 @@
 
       function renderHighlander() {
         if (!state.runData) return;
+        renderServerHighlanderResult();
         renderScenario();
         renderProgramList();
         renderComparison();
@@ -1960,6 +2560,37 @@
 
       function launchHighlander() {
         if (!state.highlanderReady || !elements.gapConfirmInput.checked) return;
+        if (state.scientificSnapshot) {
+          if (state.highlanderLaunched) {
+            switchScreen("highlander");
+            return;
+          }
+          if (state.highlanderLaunching) return;
+          state.highlanderLaunching = true;
+          elements.launchHighlander.disabled = true;
+          elements.launchHighlander.textContent = "Running server Highlander…";
+          BOOT.http.launchHighlander(state.runId, true).then(function (response) {
+            var snapshot = response && response.scientific ? response.scientific : response;
+            if (!isScientificSnapshot(snapshot)) {
+              throw new Error("server response did not include labrador.scientific-snapshot.v1");
+            }
+            ingestSnapshot(snapshot);
+            if (!state.highlanderLaunched) {
+              throw new Error("server did not mark the Highlander job launched");
+            }
+            showToast(state.highlanderResult
+              ? "Server Highlander result loaded from " + (state.packetSnapshot || "the pinned packet") + "."
+              : "Server launch completed without a comparison result; no browser substitute was created.");
+            switchScreen("highlander");
+          }).catch(function (error) {
+            showToast("Server Highlander could not complete: " + String(error && error.message));
+            announce("Server Highlander failed. Terminal producer packets remain visible; no browser comparison was substituted.");
+          }).finally(function () {
+            state.highlanderLaunching = false;
+            renderReadiness();
+          });
+          return;
+        }
         if (!state.highlanderLaunched) {
           state.highlanderLaunched = true;
           var nav = document.querySelector('[data-nav="highlander"]');
@@ -2142,6 +2773,43 @@
           "<tr><td>Recruitability</td><td>clinical_simulation</td><td>A failed live attempt and schema-valid DEMO_FALLBACK remain separate truths.</td></tr>" +
           "<tr><td>Tractability</td><td>simulation</td><td>Validated cached output is inspectable; no scalar atomistic score is imputed.</td></tr>" +
           "<tr><td>Highlander</td><td>hypothesis-highlander</td><td>CLIENT-SIDE COMPARISON · SERVER CONSUMER NOT WIRED.</td></tr>";
+
+        if (BOOT.launchMode === "scientific") {
+          setupModeChip.textContent = "Scientific replay · explicit IRAK4 preset";
+          elements.runButton.textContent = "Run scientific branch pipeline →";
+          elements.maxHypotheses.value = "1";
+          elements.maxHypotheses.disabled = true;
+          state.metrics.simulation = "support";
+          document.querySelectorAll('[data-metric-stage="simulation"]').forEach(function (button) {
+            if (button.dataset.metricValue === "tractability_fit") {
+              button.dataset.metricValue = "support";
+              button.textContent = "Native dossier (categorical)";
+              button.hidden = false;
+              button.setAttribute("aria-pressed", "true");
+            } else {
+              button.hidden = true;
+              button.setAttribute("aria-pressed", "false");
+            }
+          });
+          document.getElementById("simulation-axis-source").innerHTML = "categorical<br>native artifact";
+          document.getElementById("highlander-mode-description").textContent = "Server-native producer packet comparison";
+          document.getElementById("highlander-mode-chip").textContent = "SERVER HIGHLANDER";
+          document.getElementById("highlander-server-chip").textContent = "AWAITING PACKETS";
+          document.getElementById("comparison-mode-badge").textContent = "server result";
+          document.getElementById("gap-confirm-copy").textContent = "I acknowledge terminal producer failures remain visible and incomparable. Run the pinned server Highlander consumer.";
+          document.getElementById("module-dialog-summary").textContent = "Explicit scientific mode uses the checked-in IRAK4/RA v3 setup frame, deterministic replay, one HypGen run per evidence focus, and server-native Highlander.";
+          document.querySelector("#module-dialog .module-table tbody").innerHTML =
+            "<tr><td>Evidence mapping</td><td>research-evidence-mapper</td><td>One explicit replay; only real biomarker and supported process focuses become branches.</td></tr>" +
+            "<tr><td>Hypothesis generation</td><td>Hypothesis_Generator</td><td>One full provider-shaped replay per selected focus.</td></tr>" +
+            "<tr><td>ROI / impact</td><td>rnpv-roi-calculator</td><td>Native output uses the separate analyst-supplied valuation frame.</td></tr>" +
+            "<tr><td>Recruitability</td><td>clinical_simulation</td><td>Native simulated_* fields remain unchanged and visible.</td></tr>" +
+            "<tr><td>Tractability</td><td>simulation</td><td>Native categorical dossier; no browser scalar is invented.</td></tr>" +
+            "<tr><td>Highlander</td><td>hypothesis-highlander</td><td>Pinned server consumer; packet hashes, Pareto membership, and next evidence action are rendered verbatim.</td></tr>";
+        }
+        if (BOOT.runId) {
+          setupModeChip.textContent = "Attach read-only · " + BOOT.runId;
+          elements.runButton.textContent = "Attach to configured run →";
+        }
       }
 
       function initialize() {
@@ -2151,6 +2819,7 @@
         applyBootMode();
         validateSetup();
         renderProgress();
+        if (BOOT.runId) attachConfiguredRun(BOOT.runId);
       }
 
       initialize();

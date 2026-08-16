@@ -10,12 +10,32 @@ const terminalSnapshot = JSON.parse(
     "utf8",
   ),
 );
+const scientificSnapshot = JSON.parse(
+  fs.readFileSync(
+    new URL("./fixtures/orchestrator-scientific-snapshot.json", import.meta.url),
+    "utf8",
+  ),
+);
 const appHtml = fs.readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 
 function ingestTerminalSnapshot() {
   const harness = loadFunctionalApp();
   prepareRun(harness);
   harness.hooks.ingestSnapshot(structuredClone(terminalSnapshot));
+  return harness;
+}
+
+function ingestScientificSnapshot(snapshot = scientificSnapshot) {
+  const harness = loadFunctionalApp({ search: "?backend=http&mode=scientific" });
+  prepareRun(harness);
+  harness.hooks.state.snapshot = Object.freeze({
+    ...harness.hooks.state.snapshot,
+    biomarkers: 3,
+    hypotheses: 1,
+  });
+  harness.hooks.state.runData.requestedLanes = 3;
+  harness.hooks.buildScaffold();
+  harness.hooks.ingestSnapshot(structuredClone(snapshot));
   return harness;
 }
 
@@ -515,4 +535,205 @@ test("frontend v0 rejects unsupported indications before creating a run", () => 
   hooks.elements.indication.value = "Rheumatoid arthritis";
   const supported = hooks.validateSetup();
   assert.equal(supported.valid, true);
+});
+
+test("scientific snapshot binds three exact focus branches and native artifacts", () => {
+  const { hooks } = ingestScientificSnapshot();
+
+  assert.equal(hooks.state.scientificSnapshot, true);
+  assert.equal(hooks.state.runData.biomarkers.length, 3);
+  assert.equal(hooks.state.runData.programs.length, 3);
+  assert.deepEqual(
+    hooks.state.runData.programs.map((program) => program.id),
+    ["BR-01-b1", "BR-02-b2", "BR-03-p1"],
+  );
+  assert.equal(
+    hooks.state.runData.biomarkers[2].label,
+    "Mechanistic/PD readout: Pathway readout",
+  );
+  assert.equal(hooks.state.runData.programs[0].metrics.recruit, 72);
+  assert.equal(hooks.state.runData.programs[0].metrics.duration, 22);
+  assert.equal(hooks.state.runData.programs[0].metrics.rnpv, 45);
+  assert.equal(hooks.state.runData.programs[0].stationPayloads.recruitability.simulated_months_to_enroll, 22);
+  assert.equal(hooks.state.runData.programs[0].scientificNodes.roi_calculator.output_hash, "sha256:output-roi-b1");
+});
+
+test("scientific focus copy stays mode-neutral while explicit LIVE origins remain visible", () => {
+  const replay = ingestScientificSnapshot();
+  const processFocus = replay.hooks.state.runData.biomarkers[2];
+
+  assert.equal(replay.hooks.state.executionMode, "REPLAY");
+  assert.match(processFocus.summary, /selected from producer evidence/);
+  assert.doesNotMatch(processFocus.summary, /selected from live evidence/i);
+  assert.equal(replay.hooks.findNode("hyp-slot-2").outputOrigin, "DETERMINISTIC_REPLAY");
+
+  const liveSnapshot = structuredClone(scientificSnapshot);
+  liveSnapshot.execution_mode = "LIVE";
+  liveSnapshot.branches[2].nodes.hypothesis_generator.output_origin = "LIVE";
+  const live = ingestScientificSnapshot(liveSnapshot);
+  live.hooks.renderInspector(live.hooks.findNode("hyp-slot-2"));
+
+  assert.equal(live.hooks.state.executionMode, "LIVE");
+  assert.match(live.hooks.state.runData.biomarkers[2].summary, /selected from producer evidence/);
+  assert.match(
+    live.hooks.elements.inspectorBody.innerHTML,
+    /<span>Output origin<\/span><strong>LIVE<\/strong>/,
+  );
+});
+
+test("scientific inspector shows exact hashes, native simulated names, and terminal reasons", () => {
+  const { hooks } = ingestScientificSnapshot();
+
+  hooks.renderInspector(hooks.findNode("recruitability-slot-0"));
+  const clinicalHtml = hooks.elements.inspectorBody.innerHTML;
+  assert.match(clinicalHtml, /simulated_months_to_enroll/);
+  assert.match(clinicalHtml, /sha256:input-clin-b1/);
+  assert.match(clinicalHtml, /sha256:output-clin-b1/);
+  assert.match(clinicalHtml, /REagent-LABrador\/clinical_simulation/);
+
+  hooks.renderInspector(hooks.findNode("hyp-slot-1"));
+  const failureHtml = hooks.elements.inspectorBody.innerHTML;
+  assert.match(failureHtml, /CREDENTIAL_MISSING/);
+  assert.match(failureHtml, /ANTHROPIC_API_KEY is missing/);
+  assert.match(failureHtml, /CANNOT_COMPLETE/);
+  assert.match(failureHtml, /NOT RUN/);
+  assert.match(failureHtml, /sha256:output-hyp-b2-failure/);
+});
+
+test("scientific comparison membership comes only from the server result", () => {
+  const { hooks } = ingestScientificSnapshot();
+  const frontier = hooks.state.runData.programs[0];
+  const processFrontier = hooks.state.runData.programs[2];
+  const failed = hooks.state.runData.programs[1];
+
+  assert.equal(hooks.serverStatusLabel(frontier), "FRONTIER");
+  assert.equal(hooks.serverStatusLabel(processFrontier), "FRONTIER");
+  assert.equal(hooks.serverStatusLabel(failed), "INCOMPARABLE");
+  assert.equal(hooks.programStatus(frontier), "non-dominated");
+
+  frontier.metrics = {
+    ...frontier.metrics,
+    rnpv: -999999,
+    recruit: 0,
+    tractability_fit: 0,
+  };
+  processFrontier.metrics = {
+    ...processFrontier.metrics,
+    rnpv: 999999,
+    recruit: 100,
+    tractability_fit: 100,
+  };
+  frontier.displayMetricBasis = "REPRESENTATIVE_DEMO_SCENARIO_V1";
+  frontier.displayMetrics = { rnpv: -1, recruit: -1, tractability_fit: -1 };
+
+  assert.equal(
+    hooks.programStatus(frontier),
+    "non-dominated",
+    "browser and representative values cannot change server Pareto membership",
+  );
+  assert.equal(hooks.programStatus(processFrontier), "non-dominated");
+});
+
+test("server Highlander Pareto set and producer-grounded action render verbatim", () => {
+  const { hooks } = ingestScientificSnapshot();
+  hooks.renderHighlander();
+
+  const html = hooks.elements.serverHighlanderResult.innerHTML;
+  assert.equal(hooks.elements.serverHighlanderResult.hidden, false);
+  assert.match(html, /H-b1, H-p1/);
+  assert.match(html, /Measure target engagement in synovial tissue/);
+  assert.match(html, /sha256:output-sim-p1/);
+  assert.match(html, /sha256:highlander-result-test/);
+  assert.match(hooks.elements.programDetail.innerHTML, /SERVER|FRONTIER/);
+  assert.match(hooks.elements.programDetail.innerHTML, /Representative values excluded from scientific packet: yes/);
+});
+
+test("representative watermark appears only for explicit representative demo mode", () => {
+  const scientific = ingestScientificSnapshot();
+  assert.equal(scientific.hooks.elements.representativeWatermark.hidden, true);
+  assert.equal(scientific.hooks.elements.representativeWatermark.textContent, "");
+
+  const strayWatermark = structuredClone(scientificSnapshot);
+  strayWatermark.watermark = "SHOULD NOT SHOW";
+  const nonRepresentative = ingestScientificSnapshot(strayWatermark);
+  assert.equal(nonRepresentative.hooks.elements.representativeWatermark.hidden, true);
+
+  const representative = structuredClone(scientificSnapshot);
+  representative.presentation_mode = "REPRESENTATIVE_DEMO";
+  representative.representative_demo = true;
+  representative.watermark = "REPRESENTATIVE DEMO VALUES";
+  const demo = ingestScientificSnapshot(representative);
+  assert.equal(demo.hooks.elements.representativeWatermark.hidden, false);
+  assert.equal(demo.hooks.elements.representativeWatermark.textContent, "REPRESENTATIVE DEMO VALUES");
+});
+
+test("explicit scientific launch mode builds the checked-in v3 IRAK4 replay frame", () => {
+  const { hooks, document } = loadFunctionalApp({ search: "?backend=http&mode=scientific" });
+  hooks.applyBootMode();
+  const setup = hooks.buildScientificSetup({
+    indication: "Rheumatoid arthritis",
+    biomarkers: 3,
+  });
+
+  assert.equal(hooks.BOOT.launchMode, "scientific");
+  assert.equal(setup.schemaVersion, "labrador.run-setup.v3");
+  assert.equal(setup.execution.mode, "REPLAY");
+  assert.equal(setup.execution.presentationMode, "SCIENTIFIC");
+  assert.equal(
+    setup.exploration.evidenceRequest.target,
+    "can a small-molecule IRAK4 inhibitor suppress synovial fibroblast-driven inflammation in rheumatoid arthritis, or is its effect confined to the myeloid compartment?",
+  );
+  assert.equal(
+    setup.exploration.evidenceRequest.reason,
+    "frozen golden path for the REagent-LABrador integration demo",
+  );
+  assert.equal(setup.exploration.focus.maxBranches, 3);
+  assert.equal(setup.program.frame.target.symbol, "IRAK4");
+  assert.equal(setup.program.frame.target.uniprotAccession, "Q9NWZ3");
+  assert.equal(setup.program.valuationFrame.target, "IRAK4");
+  assert.equal(hooks.elements.maxHypotheses.value, "1");
+  assert.equal(hooks.elements.maxHypotheses.disabled, true);
+  assert.match(document.getElementById("setup-mode-chip").textContent, /Scientific replay/);
+});
+
+test("run query attaches read-only without creating another backend run", () => {
+  let attachedRunId = null;
+  let createCalls = 0;
+  const httpBackend = {
+    createRun() {
+      createCalls += 1;
+      return Promise.resolve({ runId: "LR-UNEXPECTED" });
+    },
+    startPolling(runId) {
+      attachedRunId = runId;
+      return { stop() {} };
+    },
+  };
+  const { hooks, document } = loadFunctionalApp({
+    search: "?backend=http&mode=scientific&run=LR-SCIENTIFIC-TEST",
+    httpBackend,
+  });
+  const setNumber = (id, value, min, max) => {
+    const input = document.getElementById(id);
+    input.value = String(value);
+    input.min = String(min);
+    input.max = String(max);
+  };
+  document.getElementById("clinical-indication").value = "Rheumatoid arthritis";
+  setNumber("max-biomarkers", 3, 1, 10);
+  setNumber("max-papers", 40, 1, 100);
+  setNumber("max-hypotheses", 1, 1, 10);
+  setNumber("biomarker-low", 1, 1, 10);
+  setNumber("biomarker-high", 10, 1, 10);
+  setNumber("hypothesis-low", 1, 1, 10);
+  setNumber("hypothesis-high", 10, 1, 10);
+
+  hooks.applyBootMode();
+  hooks.attachConfiguredRun(hooks.BOOT.runId);
+
+  assert.equal(hooks.BOOT.runId, "LR-SCIENTIFIC-TEST");
+  assert.equal(attachedRunId, "LR-SCIENTIFIC-TEST");
+  assert.equal(createCalls, 0);
+  assert.equal(hooks.state.runId, "LR-SCIENTIFIC-TEST");
+  assert.match(document.getElementById("snapshot-note").textContent, /No new run was created/);
 });

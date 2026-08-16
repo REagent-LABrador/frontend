@@ -3,8 +3,15 @@ import vm from "node:vm";
 
 import {
   interpretabilityView,
+  isScientificSnapshot,
   normalizeStageTruth,
   resolveBackendBase,
+  scientificCandidateId,
+  scientificComparisonStatus,
+  scientificHighlanderCandidate,
+  scientificModuleId,
+  scientificNodeForStage,
+  scientificStageId,
   stationPayloadFor,
 } from "../../app/js/snapshot-contract.js";
 
@@ -17,6 +24,7 @@ export class FakeElement {
     this.dataset = {};
     this.disabled = false;
     this.innerHTML = "";
+    this.hidden = false;
     this.max = "";
     this.min = "";
     this.open = false;
@@ -64,7 +72,7 @@ export class FakeElement {
   }
 }
 
-export function loadFunctionalApp({ search = "?backend=http" } = {}) {
+export function loadFunctionalApp({ search = "?backend=http", httpBackend = null } = {}) {
   const elements = new Map();
   const getElement = (id) => {
     if (!elements.has(id)) elements.set(id, new FakeElement());
@@ -93,12 +101,19 @@ export function loadFunctionalApp({ search = "?backend=http" } = {}) {
     clearTimeout,
     console,
     createHttpBackend() {
-      return {};
+      return httpBackend || {};
     },
     document,
     interpretabilityView,
+    isScientificSnapshot,
     normalizeStageTruth,
     resolveBackendBase,
+    scientificCandidateId,
+    scientificComparisonStatus,
+    scientificHighlanderCandidate,
+    scientificModuleId,
+    scientificNodeForStage,
+    scientificStageId,
     stationPayloadFor,
     setTimeout,
     window,
@@ -111,8 +126,12 @@ export function loadFunctionalApp({ search = "?backend=http" } = {}) {
   const hookInjection = `
     globalThis.__LABRADOR_TEST_HOOKS__ = {
       state,
+      BOOT,
       elements,
       applyStationDerivations,
+      applyBootMode,
+      attachConfiguredRun,
+      buildScientificSetup,
       buildScaffold,
       bindStage,
       centerGraphOnActiveLineage,
@@ -120,7 +139,11 @@ export function loadFunctionalApp({ search = "?backend=http" } = {}) {
       ingestSnapshot,
       metricCell,
       programStatus,
+      renderHighlander,
       renderInspector,
+      renderServerHighlanderResult,
+      serverStatusLabel,
+      translateScientificWire,
       translateWire,
       validateSetup,
       renderInterpretability:
