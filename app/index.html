@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- No CSP meta here (unlike the frozen mockup at the repo root): http backend mode
+       needs connect-src to reach the run API. Set a real CSP at the serving layer in production. -->
+  <title>LABrador — Functional Frontend</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="desktop-notice" role="status">Desktop wireframe only. The accepted review viewport is at least 1280 × 720; all content remains available by scrolling.</div>
+
+  <header class="app-header">
+    <div class="brand" aria-label="LABrador interactive product alignment mockup">
+      <span class="brand-mark" aria-hidden="true">L</span>
+      <div>
+        <div class="brand-name">LABrador</div>
+        <div class="brand-sub">program exploration · <span id="backend-indicator">backend: mock</span></div>
+      </div>
+    </div>
+
+    <nav class="screen-nav" aria-label="Three-screen product flow">
+      <button class="nav-button" type="button" data-nav="setup" aria-current="page">1 · Run Setup</button>
+      <button class="nav-button locked" type="button" data-nav="graph" disabled>2 · Program Graph</button>
+      <button class="nav-button locked" type="button" data-nav="highlander" disabled>3 · Highlander</button>
+    </nav>
+
+    <div class="truth-stack" data-truth-strip aria-label="Prototype truth labels">
+      <span class="truth-chip">PROPOSED TARGET</span>
+      <span class="truth-chip mock">ILLUSTRATIVE MOCK DATA</span>
+      <span class="truth-chip unwired">NO MODULES WIRED</span>
+    </div>
+  </header>
+
+  <main>
+    <section id="screen-setup" class="screen setup-screen active" data-screen="setup" aria-labelledby="setup-title">
+      <div class="setup-layout">
+        <aside class="setup-intro">
+          <p class="eyebrow">Screen 01 · define the exploration envelope</p>
+          <h1 id="setup-title">Start with a bounded question.</h1>
+          <p>Configure the breadth of a program exploration. Counts are ceilings—not promises—and every downstream result remains inspectable.</p>
+          <ol class="journey-preview" aria-label="Product journey">
+            <li><span><strong>Set a clinical frame.</strong><br>Choose indication and exploration breadth.</span></li>
+            <li><span><strong>Read the program as sheet music.</strong><br>Stable lanes keep each hypothesis and its downstream records aligned.</span></li>
+            <li><span><strong>Compare tradeoffs, not a winner.</strong><br>Highlander preserves the non-dominated frontier and visible gaps.</span></li>
+          </ol>
+          <p class="micro muted"><strong>Prototype boundary:</strong> this standalone HTML calls no repository modules, APIs, models, or external services.</p>
+        </aside>
+
+        <article class="setup-panel" data-region="setup-panel">
+          <header class="setup-panel-head">
+            <div>
+              <h2>Run setup</h2>
+              <p>Six inputs · provisional product contract</p>
+            </div>
+            <span class="truth-chip mock">Mock run</span>
+          </header>
+
+          <form id="setup-form" class="setup-form" novalidate>
+            <fieldset class="setup-control" data-setup-input="clinical-indication" data-input-order="1">
+              <div class="control-label-row">
+                <label class="control-label" for="clinical-indication"><span class="control-index">01</span>Clinical indication</label>
+                <span class="control-help">Required · retained on error</span>
+              </div>
+              <input id="clinical-indication" class="text-input" name="clinicalIndication" type="text" value="Rheumatoid arthritis" autocomplete="off" aria-describedby="indication-help indication-error">
+              <p id="indication-help" class="control-help">The fixed root of this exploration; it does not imply an approved target or claim.</p>
+              <p id="indication-error" class="field-error" aria-live="polite"></p>
+            </fieldset>
+
+            <fieldset class="setup-control" data-setup-input="biomarker-range" data-input-order="2">
+              <legend><span class="control-index">02</span>Biomarker exploration range</legend>
+              <div class="dual-range-wrap" data-range-group="biomarker">
+                <div class="range-values"><span id="biomarker-low-value">1 · Established</span><span id="biomarker-high-value">10 · Untested but plausible</span></div>
+                <div class="dual-range">
+                  <div class="range-track"></div><div id="biomarker-fill" class="range-fill"></div>
+                  <input id="biomarker-low" type="range" min="1" max="10" step="1" value="1" aria-label="Biomarker range lower bound" aria-describedby="biomarker-interval">
+                  <input id="biomarker-high" type="range" min="1" max="10" step="1" value="10" aria-label="Biomarker range upper bound" aria-describedby="biomarker-interval">
+                </div>
+                <div class="range-scale" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div>
+                <p id="biomarker-interval" class="control-help">Selected interval: 1 · Established through 10 · Untested but plausible.</p>
+              </div>
+            </fieldset>
+
+            <fieldset class="setup-control" data-setup-input="max-biomarkers" data-input-order="3">
+              <div class="stepper-row">
+                <div>
+                  <label class="control-label" for="max-biomarkers"><span class="control-index">03</span>Maximum biomarkers</label>
+                  <div class="control-help">Up to this many candidates · provisional limit 5</div>
+                  <p id="max-biomarkers-error" class="field-error"></p>
+                </div>
+                <div class="stepper">
+                  <button type="button" data-step-target="max-biomarkers" data-step="-1" aria-label="Decrease maximum biomarkers">−</button>
+                  <input id="max-biomarkers" class="number-input" type="number" min="1" max="5" step="1" value="3" inputmode="numeric" aria-describedby="max-biomarkers-error">
+                  <button type="button" data-step-target="max-biomarkers" data-step="1" aria-label="Increase maximum biomarkers">+</button>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="setup-control" data-setup-input="max-literature-papers" data-input-order="4">
+              <div class="stepper-row">
+                <div>
+                  <label class="control-label" for="max-papers"><span class="control-index">04</span>Maximum literature papers</label>
+                  <div class="control-help">One shared cap · provisional limit 100</div>
+                  <p id="max-papers-error" class="field-error"></p>
+                </div>
+                <div class="stepper">
+                  <button type="button" data-step-target="max-papers" data-step="-1" aria-label="Decrease maximum literature papers">−</button>
+                  <input id="max-papers" class="number-input" type="number" min="1" max="100" step="1" value="40" inputmode="numeric" aria-describedby="max-papers-error">
+                  <button type="button" data-step-target="max-papers" data-step="1" aria-label="Increase maximum literature papers">+</button>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="setup-control" data-setup-input="hypothesis-range" data-input-order="5">
+              <legend><span class="control-index">05</span>Hypothesis boldness range</legend>
+              <div class="dual-range-wrap" data-range-group="hypothesis">
+                <div class="range-values"><span id="hypothesis-low-value">1 · Standard</span><span id="hypothesis-high-value">10 · Radical</span></div>
+                <div class="dual-range">
+                  <div class="range-track"></div><div id="hypothesis-fill" class="range-fill"></div>
+                  <input id="hypothesis-low" type="range" min="1" max="10" step="1" value="1" aria-label="Hypothesis range lower bound" aria-describedby="hypothesis-interval">
+                  <input id="hypothesis-high" type="range" min="1" max="10" step="1" value="10" aria-label="Hypothesis range upper bound" aria-describedby="hypothesis-interval">
+                </div>
+                <div class="range-scale" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div>
+                <p id="hypothesis-interval" class="control-help">Selected interval: 1 · Standard through 10 · Radical.</p>
+              </div>
+            </fieldset>
+
+            <fieldset class="setup-control" data-setup-input="max-hypotheses-per-biomarker" data-input-order="6">
+              <div class="stepper-row">
+                <div>
+                  <label class="control-label" for="max-hypotheses"><span class="control-index">06</span>Maximum hypotheses per biomarker</label>
+                  <div class="control-help">Up to this many branches · provisional limit 5</div>
+                  <p id="max-hypotheses-error" class="field-error"></p>
+                </div>
+                <div class="stepper">
+                  <button type="button" data-step-target="max-hypotheses" data-step="-1" aria-label="Decrease maximum hypotheses per biomarker">−</button>
+                  <input id="max-hypotheses" class="number-input" type="number" min="1" max="5" step="1" value="3" inputmode="numeric" aria-describedby="max-hypotheses-error">
+                  <button type="button" data-step-target="max-hypotheses" data-step="1" aria-label="Increase maximum hypotheses per biomarker">+</button>
+                </div>
+              </div>
+            </fieldset>
+
+            <div class="setup-summary" data-region="validation-summary">
+              <strong id="branch-preview">Up to 3 biomarkers and up to 9 hypothesis branches.</strong>
+              <div id="paper-preview" class="micro">The illustrative mapper may inspect up to 40 paper records. Returned counts may be lower.</div>
+            </div>
+
+            <div id="snapshot-note" class="snapshot-note" role="status"></div>
+
+            <div class="setup-actions">
+              <p>Run creates an immutable setup snapshot, then plays an accelerated deterministic stage demo. Target product refresh fallback: 5 seconds.</p>
+              <button id="run-button" class="run-button" type="submit">Run illustrative exploration →</button>
+            </div>
+          </form>
+        </article>
+      </div>
+    </section>
+
+    <section id="screen-graph" class="screen graph-screen" data-screen="graph" aria-labelledby="graph-title">
+      <header class="run-header" data-region="run-header">
+        <div class="run-identity">
+          <p class="eyebrow">Screen 02 · program graph</p>
+          <h1 id="graph-title"><span id="graph-indication">Rheumatoid arthritis</span></h1>
+          <p><span id="graph-run-id" class="mono">RUN—</span> · immutable setup: <span id="graph-snapshot">up to 3 × 3; 40 papers</span></p>
+        </div>
+        <div id="progress-strip" class="progress-strip" aria-label="Sequential five-stage progress"></div>
+        <div class="run-tools">
+          <button id="freshness-button" class="button small" type="button">Simulate stale UI</button>
+          <button id="restart-demo" class="button small" type="button">Restart mock arrivals</button>
+          <button id="module-map-button" class="button small" type="button">Module alignment</button>
+          <div id="freshness" class="freshness" data-state="fresh">UI freshness: FRESH · awaiting run</div>
+        </div>
+      </header>
+
+      <div id="graph-scroller" class="graph-scroller" data-region="graph-viewport" tabindex="0" aria-label="Scrollable program graph viewport">
+        <div id="graph-surface" class="graph-surface" data-region="graph-canvas">
+          <div class="band-bg" data-graph-root="indication" data-stage="indication" data-shelf-label="fixed indication root" style="top:0"></div>
+          <div class="band-bg" data-graph-stage="biomarker" data-stage="biomarker" data-shelf-label="pending / missing shelf" style="top:440px"></div>
+          <div class="band-bg" data-graph-stage="hypothesis" data-stage="hypothesis" data-shelf-label="pending / missing shelf" style="top:880px"></div>
+          <div class="band-bg" data-graph-stage="roi" data-stage="roi" data-shelf-label="pending / missing shelf" style="top:1320px"></div>
+          <div class="band-bg" data-graph-stage="recruitability" data-stage="recruitability" data-shelf-label="pending / missing shelf" style="top:1760px"></div>
+          <div class="band-bg" data-graph-stage="simulation" data-stage="simulation" data-shelf-label="pending / missing shelf" style="top:2200px"></div>
+
+          <svg id="connectors" class="connectors" aria-hidden="true" viewBox="0 0 2968 2640" preserveAspectRatio="none"></svg>
+          <div id="graph-nodes" class="graph-nodes"></div>
+
+          <aside class="stage-rail" data-region="metric-rail" aria-label="Sticky stage and metric rail">
+            <div class="rail-band" data-stage="indication">
+              <span class="rail-kicker">Fixed root</span><h2>Indication</h2>
+              <p>Submitted clinical frame. No metric repositions this root.</p>
+            </div>
+            <div class="rail-band" data-stage="biomarker">
+              <span class="rail-kicker">Stage 01</span><h2>Biomarker / target</h2>
+              <label class="sr-only" for="metric-biomarker">Biomarker display metric</label>
+              <select id="metric-biomarker" class="metric-select" data-metric-stage="biomarker">
+                <option value="exploration">Exploration posture</option><option value="evidence">Evidence support</option><option value="pursuit">Prior pursuit</option>
+              </select>
+              <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">named scale<br>illustrative</span></div>
+            </div>
+            <div class="rail-band" data-stage="hypothesis">
+              <span class="rail-kicker">Stage 02</span><h2>Hypothesis</h2>
+              <label class="sr-only" for="metric-hypothesis">Hypothesis display metric</label>
+              <select id="metric-hypothesis" class="metric-select" data-metric-stage="hypothesis">
+                <option value="boldness">Boldness</option><option value="evidence">Evidence support</option><option value="plausibility">Biological plausibility</option>
+              </select>
+              <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">1–10<br>proxy</span></div>
+            </div>
+            <div class="rail-band" data-stage="roi">
+              <span class="rail-kicker">Stage 03</span><h2>ROI / impact</h2>
+              <label class="sr-only" for="metric-roi">ROI display metric</label>
+              <select id="metric-roi" class="metric-select" data-metric-stage="roi">
+                <option value="rnpv">P50 rNPV</option><option value="positive">Probability positive rNPV</option><option value="impact">Clinical impact</option>
+              </select>
+              <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">$M / %<br>modeled</span></div>
+            </div>
+            <div class="rail-band" data-stage="recruitability">
+              <span class="rail-kicker">Stage 04</span><h2>Recruitability</h2>
+              <label class="sr-only" for="metric-recruitability">Recruitability display metric</label>
+              <select id="metric-recruitability" class="metric-select" data-metric-stage="recruitability">
+                <option value="recruit">Recruitability</option><option value="duration">Enrollment duration</option><option value="screens">Screens per enrollee</option><option value="risk">Recruitability risk</option>
+              </select>
+              <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">0–100<br>simulated</span></div>
+            </div>
+            <div class="rail-band" data-stage="simulation">
+              <span class="rail-kicker">Stage 05</span><h2>Atomistic simulation</h2>
+              <label class="sr-only" for="metric-simulation">Simulation display metric</label>
+              <select id="metric-simulation" class="metric-select" data-metric-stage="simulation">
+                <option value="support">Atomistic support</option><option value="occupancy">Pose occupancy</option><option value="convergence">Convergence</option>
+              </select>
+              <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">missing shelf<br>not wired</span></div>
+            </div>
+          </aside>
+
+          <div class="graph-legend" aria-label="Graph state legend"><span>solid = bound record</span><span>·</span><span>dashed = requested capacity</span><span>·</span><span>dotted = real pending</span></div>
+        </div>
+      </div>
+
+      <footer class="graph-footer" data-region="highlander-readiness">
+        <div>
+          <div class="readiness-title"><strong>Highlander readiness</strong><span id="readiness-state">BLOCKED · stages nonterminal</span></div>
+          <div id="packet-counts" class="packet-counts"><span class="packet-count">0 complete</span><span class="packet-count">0 partial</span><span class="packet-count">0 blocked</span><span class="packet-count">5 nonterminal stages</span></div>
+        </div>
+        <label id="gap-confirm" class="gap-confirm"><input id="gap-confirm-input" type="checkbox"> I acknowledge terminal packet gaps and proxy / not-wired inputs. Continue for product review only.</label>
+        <button id="launch-highlander" class="button primary launch-button" type="button" disabled>Launch Highlander · blocked</button>
+      </footer>
+
+      <aside id="inspector" class="inspector" data-region="interpretability-inspector" aria-labelledby="inspector-heading" aria-hidden="true">
+        <header class="inspector-head">
+          <div class="inspector-title"><h2 id="inspector-heading" tabindex="-1">Node inspector</h2><p id="inspector-subtitle">No record selected</p></div>
+          <div class="inspector-head-actions">
+            <button class="icon-button collapse-inspector" type="button" aria-label="Collapse inspector">›</button>
+            <button class="icon-button close-inspector" type="button" aria-label="Clear selection and close inspector">×</button>
+          </div>
+          <span id="collapsed-identity" class="collapsed-identity"></span>
+        </header>
+        <div id="inspector-body" class="inspector-body"></div>
+      </aside>
+
+      <details class="sr-only">
+        <summary>Semantic indication to downstream lineage outline</summary>
+        <div id="semantic-outline"></div>
+      </details>
+    </section>
+
+    <section id="screen-highlander" class="screen highlander-screen" data-screen="highlander" aria-labelledby="highlander-title">
+      <header class="highlander-head" data-region="frontier-header">
+        <div>
+          <p class="eyebrow">Screen 03 · hypothesis highlander</p>
+          <h1 id="highlander-title">Tradeoffs remain visible.</h1>
+          <p><span id="highlander-run-id" class="mono">RUN—</span> · Highlander mock v0.1 · packet snapshot <span id="packet-snapshot" class="mono">—</span></p>
+        </div>
+        <div class="frontier-count">
+          <div class="frontier-stat"><strong id="frontier-total">0</strong><span>non-dominated</span></div>
+          <div class="frontier-stat"><strong id="gap-total">0</strong><span>with gaps</span></div>
+        </div>
+        <div class="truth-stack"><span class="truth-chip mock">Proxy frontier</span><span class="truth-chip unwired">Not decision grade</span></div>
+      </header>
+
+      <div class="highlander-grid">
+        <div class="region-stack left-stack">
+          <section class="card" data-region="scenario-controls" aria-labelledby="scenario-title">
+            <div class="card-head"><div><h2 id="scenario-title">Viewing scenario</h2><p>Preferences alter view order—not raw objectives or baseline Pareto status.</p></div></div>
+            <label class="sr-only" for="scenario-profile">Scenario profile</label>
+            <select id="scenario-profile" class="scenario-select">
+              <option value="balanced">Balanced evidence · v1</option>
+              <option value="capital">Capital preservation · v1</option>
+              <option value="speed">Enrollment speed · v1</option>
+            </select>
+            <div id="scenario-meta" class="scenario-meta"></div>
+            <div id="weight-list" class="weight-list" aria-label="Viewing preference weights"></div>
+            <div class="constraint-box"><strong>Hard constraints are separate.</strong><br>Applying one requires rationale and creates a new decision-set version. No constraint has been applied.</div>
+          </section>
+
+          <section class="card" data-region="program-list" aria-labelledby="program-list-title">
+            <div class="card-head"><div><h2 id="program-list-title">Programs</h2><p>Non-dominated first. Selection is not a winner designation.</p></div></div>
+            <div class="program-filters">
+              <label><input id="show-dominated" type="checkbox" checked> dominated</label>
+              <label><input id="show-incomparable" type="checkbox" checked> incomparable</label>
+            </div>
+            <div id="program-list" class="program-list"></div>
+          </section>
+        </div>
+
+        <div class="region-stack middle-stack">
+          <section class="card" data-region="program-comparison" data-highlander-section="comparison" aria-labelledby="comparison-title">
+            <div class="card-head"><div><h2 id="comparison-title">Raw objective comparison</h2><p>Original units, uncertainty, qualifiers, and baseline frontier membership. No global winner.</p></div><span class="badge proxy">illustrative</span></div>
+            <div class="comparison-wrap"><table class="comparison-table"><thead><tr><th>Program</th><th>P50 rNPV</th><th>Positive rNPV</th><th>Recruitability</th><th>Enroll</th><th>Plausibility</th><th>Simulation</th><th>Baseline status</th></tr></thead><tbody id="comparison-body"></tbody></table></div>
+            <figure class="pareto-figure">
+              <figcaption><strong>Pareto view:</strong> recruitability vs P50 rNPV. Shape/status retains incomplete records; axes do not collapse missing values to zero.</figcaption>
+              <svg id="pareto-plot" class="pareto-plot" viewBox="0 0 640 154" role="img" aria-label="Illustrative Pareto comparison plot"></svg>
+            </figure>
+          </section>
+
+          <section class="card" data-region="selected-program-detail" data-highlander-section="detail" aria-labelledby="detail-title">
+            <div class="card-head"><div><h2 id="detail-title">Selected program detail</h2><p>Public, inspectable justification; no hidden reasoning.</p></div><button id="open-source-node" class="button small" type="button">Open source branch</button></div>
+            <div id="program-detail"></div>
+          </section>
+        </div>
+
+        <div class="region-stack right-stack">
+          <section class="card" data-region="grounded-chat" data-highlander-section="chat" aria-labelledby="chat-title">
+            <div class="card-head"><div><h2 id="chat-title">Run-grounded chat</h2><p id="chat-scope">Read-only evidence scope · this run and Highlander job only</p></div><span class="badge skipped">not wired</span></div>
+            <div class="starter-row" aria-label="Starter questions">
+              <button class="button small starter" type="button" data-question="Why is the selected program non-dominated?">Why non-dominated?</button>
+              <button class="button small starter" type="button" data-question="What evidence would change this conclusion?">What would change it?</button>
+              <button class="button small starter" type="button" data-question="What are the main evidence gaps?">Main gaps?</button>
+            </div>
+            <div id="chat-log" class="chat-log" aria-live="polite"><div class="chat-message assistant"><span class="answer-label">Scope</span> I can synthesize only the immutable mock packet snapshot. I cannot browse, mutate a record, or create new evidence.</div></div>
+            <form id="chat-form" class="chat-form"><label class="sr-only" for="chat-input">Ask about this mock run</label><input id="chat-input" type="text" placeholder="Ask about this run…" autocomplete="off"><button class="button dark" type="submit">Ask</button></form>
+          </section>
+
+          <section class="card" data-region="human-review-actions" data-highlander-section="actions" aria-labelledby="actions-title">
+            <div class="card-head"><div><h2 id="actions-title">Human review actions</h2><p>Prototype-only audit events. Actor identity and authorization are unverified.</p></div></div>
+            <div class="action-grid">
+              <button class="button review-action" type="button" data-action="Shortlist">Shortlist</button>
+              <button class="button review-action" type="button" data-action="Add hard constraint">Add hard constraint</button>
+              <button class="button review-action" type="button" data-action="Request another run">Request another run</button>
+              <button class="button danger review-action" type="button" data-action="Exclude">Exclude</button>
+            </div>
+            <ol id="audit-log" class="audit-log"><li>No review events yet. Source scientific records remain unchanged.</li></ol>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="module-dialog" aria-labelledby="module-dialog-title">
+    <div class="dialog-head"><div><p class="eyebrow">Repository alignment</p><h2 id="module-dialog-title">Target adapters vs current reality</h2></div><button class="dialog-close" type="button" data-close-dialog="module-dialog" aria-label="Close module alignment">×</button></div>
+    <div class="dialog-body">
+      <p class="micro">This map is documentation—not an integration claim. The standalone mockup makes no module calls.</p>
+      <table class="module-table"><thead><tr><th>Target stage</th><th>Repository module</th><th>Current mockup truth</th></tr></thead><tbody>
+        <tr><td>Evidence mapping</td><td>research-evidence-mapper</td><td>Target adapter; standalone deployment exists, flow adapter unverified.</td></tr>
+        <tr><td>Hypothesis generation</td><td>planned hypothesis node</td><td>NOT WIRED; source node has no pushed implementation.</td></tr>
+        <tr><td>ROI / impact</td><td>therapeutic-program-economics</td><td>Runnable locally; mock outputs synthetic and NOT_DECISION_GRADE.</td></tr>
+        <tr><td>Recruitability</td><td>trial-recruitment-forecaster</td><td>Runnable locally; this UI uses simulated proxy fields only.</td></tr>
+        <tr><td>Atomistic simulation</td><td>target capability</td><td>SKIPPED · MODULE_NOT_WIRED · result basis NOT WIRED.</td></tr>
+        <tr><td>Highlander</td><td>hypothesis-highlander</td><td>Local proxy module; real node-contract interop unverified.</td></tr>
+      </tbody></table>
+    </div>
+    <div class="dialog-actions"><button class="button dark" type="button" data-close-dialog="module-dialog">Close</button></div>
+  </dialog>
+
+  <dialog id="action-dialog" aria-labelledby="action-dialog-title">
+    <form id="action-form" method="dialog" novalidate>
+      <div class="dialog-head"><div><p class="eyebrow">Prototype audit event</p><h2 id="action-dialog-title">Record review action</h2></div><button class="dialog-close" type="button" data-close-dialog="action-dialog" aria-label="Cancel review action">×</button></div>
+      <div class="dialog-body">
+        <p id="action-description" class="micro"></p>
+        <label for="action-rationale"><strong>Required rationale</strong></label>
+        <textarea id="action-rationale" required placeholder="Explain why this human review action is appropriate…"></textarea>
+        <p id="action-error" class="field-error"></p>
+      </div>
+      <div class="dialog-actions"><button class="button" type="button" data-close-dialog="action-dialog">Cancel</button><button class="button primary" type="submit">Record mock event</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
