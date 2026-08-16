@@ -74,6 +74,30 @@ export class FakeElement {
 
 export function loadFunctionalApp({ search = "?backend=http", httpBackend = null } = {}) {
   const elements = new Map();
+  const metricButtons = [
+    ["biomarker", "exploration", true],
+    ["biomarker", "evidence", false],
+    ["biomarker", "pursuit", false],
+    ["hypothesis", "boldness", true],
+    ["hypothesis", "evidence", false],
+    ["hypothesis", "plausibility", false],
+    ["roi", "rnpv", true],
+    ["roi", "positive", false],
+    ["roi", "impact", false],
+    ["recruitability", "recruit", true],
+    ["recruitability", "duration", false],
+    ["recruitability", "screens", false],
+    ["recruitability", "risk", false],
+    ["simulation", "tractability_fit", true],
+    ["simulation", "precedent", false],
+    ["simulation", "computed", false],
+  ].map(([stage, value, pressed]) => {
+    const button = new FakeElement();
+    button.dataset.metricStage = stage;
+    button.dataset.metricValue = value;
+    button.setAttribute("aria-pressed", String(pressed));
+    return button;
+  });
   const getElement = (id) => {
     if (!elements.has(id)) elements.set(id, new FakeElement());
     return elements.get(id);
@@ -83,7 +107,16 @@ export function loadFunctionalApp({ search = "?backend=http", httpBackend = null
     createElementNS: () => new FakeElement(),
     getElementById: getElement,
     querySelector: () => new FakeElement(),
-    querySelectorAll: () => [],
+    querySelectorAll: (selector) => {
+      if (selector === ".metric-button") return metricButtons;
+      const stageMatch = selector.match(/^\[data-metric-stage=["']([^"']+)["']\]$/);
+      if (stageMatch) {
+        return metricButtons.filter(
+          (button) => button.dataset.metricStage === stageMatch[1],
+        );
+      }
+      return [];
+    },
   };
   const window = {
     clearTimeout() {},
@@ -143,6 +176,10 @@ export function loadFunctionalApp({ search = "?backend=http", httpBackend = null
       renderInspector,
       renderServerHighlanderResult,
       serverStatusLabel,
+      simulationMetricView:
+        typeof simulationMetricView === "function" ? simulationMetricView : null,
+      publicReasonSummary:
+        typeof publicReasonSummary === "function" ? publicReasonSummary : null,
       translateScientificWire,
       translateWire,
       validateSetup,
@@ -162,6 +199,7 @@ export function loadFunctionalApp({ search = "?backend=http", httpBackend = null
     document,
     elements,
     hooks: context.__LABRADOR_TEST_HOOKS__,
+    metricButtons,
   };
 }
 

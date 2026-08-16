@@ -41,17 +41,98 @@ function ingestScientificSnapshot(snapshot = scientificSnapshot) {
 
 test("stage metrics are exposed as visible button groups instead of selects", () => {
   assert.doesNotMatch(appHtml, /<select[^>]+data-metric-stage=/);
-  for (const [stage, expectedCount] of [
-    ["biomarker", 3],
-    ["hypothesis", 3],
-    ["roi", 3],
-    ["recruitability", 4],
-    ["simulation", 3],
-  ]) {
-    const matches = appHtml.match(new RegExp(`data-metric-stage="${stage}"`, "g")) || [];
-    assert.equal(matches.length, expectedCount, `${stage} must expose every metric as a button`);
+  for (const [stage, expectedValues] of Object.entries({
+    biomarker: ["exploration", "evidence", "pursuit"],
+    hypothesis: ["boldness", "evidence", "plausibility"],
+    roi: ["rnpv", "positive", "impact"],
+    recruitability: ["recruit", "duration", "screens", "risk"],
+    simulation: ["tractability_fit", "precedent", "computed"],
+  })) {
+    const values = Array.from(
+      appHtml.matchAll(
+        new RegExp(
+          `data-metric-stage="${stage}"[^>]+data-metric-value="([^"]+)"`,
+          "g",
+        ),
+      ),
+      (match) => match[1],
+    );
+    assert.deepEqual(
+      values,
+      expectedValues,
+      `${stage} must expose every metric as a stable button`,
+    );
   }
   assert.equal((appHtml.match(/aria-pressed="true"/g) || []).length, 5);
+});
+
+test("both HTTP modes keep all three tractability views available", () => {
+  for (const search of ["?backend=http", "?backend=http&mode=scientific"]) {
+    const harness = loadFunctionalApp({ search });
+    harness.hooks.applyBootMode();
+
+    const controls = harness.metricButtons.filter(
+      (button) => button.dataset.metricStage === "simulation",
+    );
+    assert.deepEqual(
+      controls.map((button) => button.dataset.metricValue),
+      ["tractability_fit", "precedent", "computed"],
+      search,
+    );
+    assert.deepEqual(
+      controls.map((button) => button.hidden),
+      [false, false, false],
+      `${search} must not collapse Stage 05 back to one control`,
+    );
+    assert.equal(
+      controls.filter(
+        (button) => button.attributes.get("aria-pressed") === "true",
+      ).length,
+      1,
+      `${search} must select exactly one Stage 05 view`,
+    );
+  }
+});
+
+test("precedent and computed tractability views stay categorical", () => {
+  const { hooks } = loadFunctionalApp();
+  assert.equal(typeof hooks.simulationMetricView, "function");
+  const payload = {
+    verdict: "small_molecule_tractable",
+    verdict_basis: "retrieved_precedent",
+    axis_conflict: null,
+    target_precedent: {
+      best_potency_nm: 0.022,
+      clinical_stage_small_molecules: [{ name: "ZIMLOVISERTIB", phase: 2 }],
+    },
+    tractability: {
+      pocket_volume_a3: { primary_d1_6_a3: 682.5 },
+      site_pocket_rank: {
+        fpocket: 2,
+        prank: 1,
+        n_pockets: 11,
+        structure_pdb_id: "6EGE",
+      },
+    },
+  };
+
+  for (const key of ["precedent", "computed"]) {
+    const view = hooks.simulationMetricView(payload, key);
+    assert.equal(view.kind, "categorical", key);
+    assert.equal(view.scalar, null, `${key} must not invent a scientific scalar`);
+    assert.equal(typeof view.placement, "string", `${key} uses a named display lane`);
+    assert.ok(view.display, `${key} supplies legible node copy`);
+    assert.ok(view.detail, `${key} supplies an interpretation`);
+    assert.ok(Array.isArray(view.sourcePaths) && view.sourcePaths.length > 0);
+  }
+  assert.match(
+    hooks.simulationMetricView(payload, "precedent").sourcePaths.join(" "),
+    /verdict_basis|target_precedent/,
+  );
+  assert.match(
+    hooks.simulationMetricView(payload, "computed").sourcePaths.join(" "),
+    /tractability|axis_conflict/,
+  );
 });
 
 test("HTTP ingestion keeps result status separate from execution, origin, and basis", () => {
@@ -109,6 +190,44 @@ test("a cached tractability payload is not relabeled as an unwired simulation", 
   assert.notEqual(simulation.resultBasis, "NOT WIRED");
   assert.notEqual(simulation.runtime, "NOT WIRED");
   assert.equal(simulation.metadata.stationPayload.verdict, "small_molecule_tractable");
+});
+
+test("machine reason codes stay in audit detail instead of primary node copy", () => {
+  const snapshot = structuredClone(terminalSnapshot);
+  const simulationStage = snapshot.stages.find(
+    (stage) => stage.stage_id === "simulation",
+  );
+  simulationStage.reason_code = "PINNED_ARTIFACT_REVALIDATED";
+
+  const harness = loadFunctionalApp();
+  prepareRun(harness);
+  harness.hooks.ingestSnapshot(snapshot);
+
+  const simulation = harness.hooks.findNode("simulation-slot-0");
+  assert.equal(simulation.reason, "PINNED_ARTIFACT_REVALIDATED");
+  assert.equal(typeof harness.hooks.publicReasonSummary, "function");
+  assert.doesNotMatch(
+    harness.hooks.publicReasonSummary(simulation),
+    /PINNED_ARTIFACT_REVALIDATED/,
+  );
+
+  const nodeCards = harness.hooks.elements.graphNodes.children.filter(
+    (element) => element.dataset.nodeId === "simulation-slot-0",
+  );
+  const nodeCard = nodeCards.at(-1);
+  assert.ok(nodeCard, "the tractability node card must be rendered");
+  assert.doesNotMatch(
+    nodeCard.innerHTML,
+    /PINNED_ARTIFACT_REVALIDATED/,
+    "the compact card needs plain-language status, not a raw machine token",
+  );
+
+  harness.hooks.renderInspector(simulation);
+  assert.match(
+    harness.hooks.elements.inspectorBody.innerHTML,
+    /PINNED_ARTIFACT_REVALIDATED/,
+    "the exact backend reason code remains inspectable in run qualifications",
+  );
 });
 
 test("the first real lineage is recentered out from under the sticky rail", () => {
