@@ -656,6 +656,14 @@ test("explicit scientific launch mode builds the checked-in v3 IRAK4 replay fram
   assert.equal(setup.schemaVersion, "labrador.run-setup.v3");
   assert.equal(setup.execution.mode, "REPLAY");
   assert.equal(setup.execution.presentationMode, "SCIENTIFIC");
+  assert.equal(
+    setup.exploration.evidenceRequest.target,
+    "can a small-molecule IRAK4 inhibitor suppress synovial fibroblast-driven inflammation in rheumatoid arthritis, or is its effect confined to the myeloid compartment?",
+  );
+  assert.equal(
+    setup.exploration.evidenceRequest.reason,
+    "frozen golden path for the REagent-LABrador integration demo",
+  );
   assert.equal(setup.exploration.focus.maxBranches, 3);
   assert.equal(setup.program.frame.target.symbol, "IRAK4");
   assert.equal(setup.program.frame.target.uniprotAccession, "Q9NWZ3");
