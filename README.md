@@ -3,7 +3,7 @@
 The user-facing layer for the REagent-LABrador pipeline: renders each
 station's output for a human — the evidence graph, the ranked hypotheses, the
 recruitability verdict, and the tractability dossier — with the honesty
-labels (SIMULATED / ASSUMED / NOT decision-grade) impossible to miss.
+labels (REPRESENTATIVE / MODELED / NOT decision-grade) impossible to miss.
 
 ## Quickstart
 
@@ -65,17 +65,19 @@ gets the full three-screen UI for free.
 - **Missing is not zero.** A metric a module didn't produce is `null` and the
   node sits on the pending/missing shelf — it is never plotted at a favorable
   position.
-- **Verbatim station payloads.** `station_payloads.*` render in the inspector
-  as "Station output (verbatim)" with no key renamed — `simulated_*` names are
-  the station's honesty contract and survive untouched.
+- **Native station artifacts.** `station_payloads.*` remain unchanged and are
+  bound to the run by hash. The judge-facing inspector projects readable
+  interpretation instead of exposing raw technical JSON.
+- **Explicit representative overlay.** A configured judging scenario may
+  supply `display_metrics` with
+  `display_metric_basis=REPRESENTATIVE_DEMO_SCENARIO_V1`. Those values drive
+  graph placement and the client-side Pareto view while native metrics and
+  station artifacts remain unchanged and inspectable through run artifacts.
 - **Shared interpretability.** An optional top-level `interpretability` object
   is rendered through one module-independent reader (headline, metrics,
   derivation steps, evidence, assumptions, uncertainty, limitations,
   counterfactuals, and lineage), while the entire native payload remains
-  available as verbatim JSON.
-- **Truth labels from `/api/meta`.** A backend declares its own maturity
-  labels for the header truth strip. HTTP mode starts with conservative local
-  labels, so static mock claims never leak into a real run if metadata is late.
+  retained in the run artifact.
 - One alarm colour is reserved for honesty flags; execution status, failure
   flags, and a payload's own basis are never collapsed into one green badge.
 
@@ -92,7 +94,7 @@ This app consumes the stations' **published JSON schemas** and nothing else:
 
 **First real integration: `clinical_simulation` (recruitability).** The
 mapping from its 18-key output to a snapshot program — `score * 100` →
-`metrics.recruit`, `simulated_months_to_enroll` → `metrics.duration`, the
+`metrics.recruit`, its native enrollment-duration field → `metrics.duration`, the
 whole result object verbatim into `station_payloads.recruitability` — is
 specified in `app/API-CONTRACT.md` under "First real station:
 clinical_simulation (recruitability)". The mock backend already ships one

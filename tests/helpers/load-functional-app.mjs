@@ -119,6 +119,7 @@ export function loadFunctionalApp({ search = "?backend=http" } = {}) {
       findNode,
       ingestSnapshot,
       metricCell,
+      programStatus,
       renderInspector,
       translateWire,
       validateSetup,

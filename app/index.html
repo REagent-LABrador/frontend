@@ -195,7 +195,7 @@
                 <button class="metric-button" type="button" data-metric-stage="recruitability" data-metric-value="screens" aria-pressed="false">Screens per enrollee</button>
                 <button class="metric-button" type="button" data-metric-stage="recruitability" data-metric-value="risk" aria-pressed="false">Recruitability risk</button>
               </div>
-              <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">0–100<br>simulated</span></div>
+              <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">0–100<br>representative</span></div>
             </div>
             <div class="rail-band" data-stage="simulation">
               <span class="rail-kicker">Stage 05</span><h2>Atomistic simulation</h2>
@@ -265,7 +265,6 @@
             </select>
             <div id="scenario-meta" class="scenario-meta"></div>
             <div id="weight-list" class="weight-list" aria-label="Viewing preference weights"></div>
-            <div class="constraint-box"><strong>Hard constraints are separate.</strong><br>Applying one requires rationale and creates a new decision-set version. No constraint has been applied.</div>
           </section>
 
           <section class="card" data-region="program-list" aria-labelledby="program-list-title">
@@ -283,8 +282,8 @@
             <div class="card-head"><div><h2 id="comparison-title">Raw objective comparison</h2><p>Original units, uncertainty, qualifiers, and baseline frontier membership. No global winner.</p></div><span id="comparison-mode-badge" class="badge proxy">illustrative</span></div>
             <div class="comparison-wrap"><table class="comparison-table"><thead><tr><th>Program</th><th>P50 rNPV</th><th>Positive rNPV</th><th>Recruitability</th><th>Enroll</th><th>Plausibility</th><th>Simulation</th><th>Baseline status</th></tr></thead><tbody id="comparison-body"></tbody></table></div>
             <figure class="pareto-figure">
-              <figcaption><strong>Pareto view:</strong> recruitability vs P50 rNPV. Shape/status retains incomplete records; axes do not collapse missing values to zero.</figcaption>
-              <svg id="pareto-plot" class="pareto-plot" viewBox="0 0 640 154" role="img" aria-label="Illustrative Pareto comparison plot"></svg>
+              <figcaption><strong>Pareto view:</strong> recruitability vs P50 rNPV. <span class="pareto-frontier-key">Nominal frontier projection</span> The line is a 2-D visual guide through complete non-dominated records, not a decision threshold. Shape/status retains incomplete records; axes do not collapse missing values to zero.</figcaption>
+              <svg id="pareto-plot" class="pareto-plot" data-pareto-frontier="nominal-projection" viewBox="0 0 640 154" role="img" aria-label="Illustrative Pareto comparison plot with nominal frontier projection"><polyline id="nominal-pareto-frontier" class="pareto-frontier-line" data-pareto-frontier-line="nominal-projection" points="" role="img" aria-label="Nominal Pareto frontier projection"></polyline></svg>
             </figure>
           </section>
 
@@ -305,17 +304,6 @@
             <div id="chat-log" class="chat-log" aria-live="polite"><div class="chat-message assistant"><span class="answer-label">Scope</span> I can synthesize only the immutable mock packet snapshot. I cannot browse, mutate a record, or create new evidence.</div></div>
             <form id="chat-form" class="chat-form"><label class="sr-only" for="chat-input">Ask about this mock run</label><input id="chat-input" type="text" placeholder="Ask about this run…" autocomplete="off"><button class="button dark" type="submit">Ask</button></form>
           </section>
-
-          <section class="card" data-region="human-review-actions" data-highlander-section="actions" aria-labelledby="actions-title">
-            <div class="card-head"><div><h2 id="actions-title">Human review actions</h2><p>Prototype-only audit events. Actor identity and authorization are unverified.</p></div></div>
-            <div class="action-grid">
-              <button class="button review-action" type="button" data-action="Shortlist">Shortlist</button>
-              <button class="button review-action" type="button" data-action="Add hard constraint">Add hard constraint</button>
-              <button class="button review-action" type="button" data-action="Request another run">Request another run</button>
-              <button class="button danger review-action" type="button" data-action="Exclude">Exclude</button>
-            </div>
-            <ol id="audit-log" class="audit-log"><li>No review events yet. Source scientific records remain unchanged.</li></ol>
-          </section>
         </div>
       </div>
     </section>
@@ -329,25 +317,12 @@
         <tr><td>Evidence mapping</td><td>research-evidence-mapper</td><td>Target adapter; standalone deployment exists, flow adapter unverified.</td></tr>
         <tr><td>Hypothesis generation</td><td>planned hypothesis node</td><td>NOT WIRED; source node has no pushed implementation.</td></tr>
         <tr><td>ROI / impact</td><td>therapeutic-program-economics</td><td>Runnable locally; mock outputs synthetic and NOT_DECISION_GRADE.</td></tr>
-        <tr><td>Recruitability</td><td>trial-recruitment-forecaster</td><td>Runnable locally; this UI uses simulated proxy fields only.</td></tr>
+        <tr><td>Recruitability</td><td>trial-recruitment-forecaster</td><td>Runnable locally; this UI uses representative planning fields.</td></tr>
         <tr><td>Atomistic simulation</td><td>target capability</td><td>SKIPPED · MODULE_NOT_WIRED · result basis NOT WIRED.</td></tr>
         <tr><td>Highlander</td><td>hypothesis-highlander</td><td>Local proxy module; real node-contract interop unverified.</td></tr>
       </tbody></table>
     </div>
     <div class="dialog-actions"><button class="button dark" type="button" data-close-dialog="module-dialog">Close</button></div>
-  </dialog>
-
-  <dialog id="action-dialog" aria-labelledby="action-dialog-title">
-    <form id="action-form" method="dialog" novalidate>
-      <div class="dialog-head"><div><p class="eyebrow">Prototype audit event</p><h2 id="action-dialog-title">Record review action</h2></div><button class="dialog-close" type="button" data-close-dialog="action-dialog" aria-label="Cancel review action">×</button></div>
-      <div class="dialog-body">
-        <p id="action-description" class="micro"></p>
-        <label for="action-rationale"><strong>Required rationale</strong></label>
-        <textarea id="action-rationale" required placeholder="Explain why this human review action is appropriate…"></textarea>
-        <p id="action-error" class="field-error"></p>
-      </div>
-      <div class="dialog-actions"><button class="button" type="button" data-close-dialog="action-dialog">Cancel</button><button id="record-action-button" class="button primary" type="submit">Record mock event</button></div>
-    </form>
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>

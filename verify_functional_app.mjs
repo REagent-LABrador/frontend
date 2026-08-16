@@ -110,8 +110,12 @@ assert.equal(
 );
 
 const appPath = fileURLToPath(new URL("./app/js/app.js", import.meta.url));
+const htmlPath = fileURLToPath(new URL("./app/index.html", import.meta.url));
+const stylesPath = fileURLToPath(new URL("./app/styles.css", import.meta.url));
 const contractPath = fileURLToPath(new URL("./app/API-CONTRACT.md", import.meta.url));
 const app = readFileSync(appPath, "utf8");
+const html = readFileSync(htmlPath, "utf8");
+const styles = readFileSync(stylesPath, "utf8");
 const contract = readFileSync(contractPath, "utf8");
 
 assert.equal(
@@ -138,8 +142,16 @@ for (const required of [
   assert.ok(contract.includes(required), `API contract must document optional ${required}`);
 }
 
+assert.doesNotMatch(html, /Human review actions|Hard constraints are separate\./);
+assert.doesNotMatch(app, /openActionDialog|recordAction|renderAuditLog/);
+assert.match(html, /data-pareto-frontier="nominal-projection"/);
+assert.match(html, /data-pareto-frontier-line="nominal-projection"/);
+assert.match(app, /var nominalFrontier = plottedPrograms\.filter/);
+assert.match(styles, /\.pareto-frontier-line\s*\{/);
+
 console.log("Functional app integration verification passed.");
 console.log("  Stage truth: module execution remains separate from fallback origin.");
 console.log("  Payloads: biomarker singular and program stage maps are consumed.");
 console.log("  Interpretability: readable projection retains native JSON verbatim.");
 console.log("  Backend base: integrated serving defaults to same origin.");
+console.log("  Highlander: review actions removed; nominal Pareto frontier rendered.");

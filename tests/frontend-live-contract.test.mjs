@@ -212,7 +212,7 @@ test("ROI keeps its own uncertainty and formats a negative value conventionally"
   assert.equal(hooks.metricCell(-24, "$", "M"), "-$24M");
 });
 
-test("an unlabeled simulated range is not invented to be an IQR", () => {
+test("native enrollment fields are presented as modeled estimates, not an invented IQR", () => {
   const { hooks } = loadFunctionalApp();
   const program = {
     metrics: {},
@@ -229,8 +229,8 @@ test("an unlabeled simulated range is not invented to be an IQR", () => {
   };
 
   hooks.applyStationDerivations(program);
-  assert.equal(program.uncertainty, "simulated months range: 93–1172");
-  assert.equal(program.recruitmentUncertainty, "simulated months range: 93–1172");
+  assert.equal(program.uncertainty, "modeled enrollment range: 93–1172 months");
+  assert.equal(program.recruitmentUncertainty, "modeled enrollment range: 93–1172 months");
   assert.doesNotMatch(program.uncertainty, /IQR/i);
 
   const programWithRoiRange = {
@@ -247,8 +247,207 @@ test("an unlabeled simulated range is not invented to be an IQR", () => {
   );
   assert.equal(
     programWithRoiRange.recruitmentUncertainty,
-    "simulated months range: 93–1172",
+    "modeled enrollment range: 93–1172 months",
   );
+});
+
+test("representative display metrics remain distinct from the shared native payload", () => {
+  const snapshot = structuredClone(terminalSnapshot);
+  snapshot.biomarkers[0].display_metric_basis = "REPRESENTATIVE_DEMO_SCENARIO_V1";
+  snapshot.biomarkers[0].display_metrics = {
+    exploration: 4,
+    evidence: 60,
+    pursuit: 2,
+  };
+  snapshot.programs[0].display_metric_basis = "REPRESENTATIVE_DEMO_SCENARIO_V1";
+  snapshot.programs[0].display_metrics = {
+    boldness: 7,
+    evidence: 72,
+    plausibility: 79,
+    rnpv: 145,
+    positive: 62,
+    impact: 82,
+    recruit: 82,
+    duration: 18,
+    screens: 2.3,
+    risk: 18,
+    tractability_fit: 86,
+  };
+  snapshot.programs[0].display_label = "myeloid response · H-g2";
+  snapshot.programs[0].display_uncertainty = "Representative rNPV P10–P90: -$35M to $310M";
+  snapshot.programs[0].display_recruitment_uncertainty =
+    "Representative enrollment range: 14–23 months";
+  snapshot.programs[0].display_tractability_uncertainty =
+    "Representative branch-context fit; native dossier remains attached.";
+
+  const harness = loadFunctionalApp();
+  prepareRun(harness);
+  harness.hooks.ingestSnapshot(snapshot);
+
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.keys(snapshot.programs[0].display_metrics).map((key) => [
+        key,
+        harness.hooks.state.runData.programs[0].metrics[key],
+      ]),
+    ),
+    snapshot.programs[0].display_metrics,
+  );
+  assert.equal(harness.hooks.findNode("roi-slot-0").metrics.rnpv, 145);
+  assert.equal(harness.hooks.findNode("recruitability-slot-0").metrics.recruit, 82);
+  assert.equal(harness.hooks.findNode("recruitability-slot-0").metrics.duration, 18);
+  assert.equal(harness.hooks.findNode("simulation-slot-0").metrics.tractability_fit, 86);
+  assert.equal(
+    harness.hooks.state.runData.programs[0].stationPayloads.recruitability.score,
+    0,
+    "native station payload remains unchanged",
+  );
+});
+
+test("nine representative branches remain distinct and produce a three-record frontier", () => {
+  const vectors = [
+    [7, 72, 79, 145, 62, 82, 82, 18, 2.3, 18, 86],
+    [6, 58, 71, 132, 57, 74, 69, 24, 3.2, 31, 64],
+    [8, 64, 73, 108, 51, 70, 75, 21, 2.8, 25, 78],
+    [7, 50, 67, 115, 53, 70, 68, 25, 3.4, 32, 62],
+    [6, 69, 74, 195, 69, 79, 62, 28, 4.0, 38, 84],
+    [8, 76, 86, 120, 55, 88, 88, 16, 2.0, 12, 88],
+    [8, 67, 70, 170, 64, 76, 55, 33, 4.9, 45, 80],
+    [7, 55, 68, 185, 67, 71, 48, 36, 5.7, 52, 60],
+    [9, 63, 72, 128, 56, 77, 77, 20, 2.7, 23, 66],
+  ];
+  const snapshot = structuredClone(terminalSnapshot);
+  const baseBiomarker = snapshot.biomarkers[0];
+  snapshot.biomarkers = [0, 1, 2].map((slot) => ({
+    ...structuredClone(baseBiomarker),
+    slot,
+    label: `RA signal ${slot + 1}`,
+    display_metric_basis: "REPRESENTATIVE_DEMO_SCENARIO_V1",
+    display_metrics: {
+      exploration: [4, 6, 5][slot],
+      evidence: [60, 50.7, 40.7][slot],
+      pursuit: [2, 2, 3][slot],
+    },
+    display_uncertainty: "Representative biomarker posture",
+  }));
+  const baseProgram = snapshot.programs[0];
+  snapshot.programs = vectors.map((vector, lane) => {
+    const [
+      boldness,
+      evidence,
+      plausibility,
+      rnpv,
+      positive,
+      impact,
+      recruit,
+      duration,
+      screens,
+      risk,
+      tractabilityFit,
+    ] = vector;
+    return {
+      ...structuredClone(baseProgram),
+      id: `branch-${lane}`,
+      lane,
+      biomarker_slot: Math.floor(lane / 3),
+      hypothesis_slot: lane % 3,
+      display_metric_basis: "REPRESENTATIVE_DEMO_SCENARIO_V1",
+      display_label: `RA signal ${Math.floor(lane / 3) + 1} · hypothesis ${(lane % 3) + 1}`,
+      display_metrics: {
+        boldness,
+        evidence,
+        plausibility,
+        rnpv,
+        positive,
+        impact,
+        recruit,
+        duration,
+        screens,
+        risk,
+        tractability_fit: tractabilityFit,
+      },
+      display_uncertainty: `Representative branch interval ${lane + 1}`,
+      display_recruitment_uncertainty: `Representative enrollment range ${lane + 1}`,
+      display_tractability_uncertainty: `Representative branch-context fit ${tractabilityFit}/100`,
+    };
+  });
+
+  const harness = loadFunctionalApp();
+  prepareRun(harness);
+  harness.hooks.state.snapshot = {
+    indication: "Rheumatoid arthritis",
+    biomarkers: 3,
+    papers: 40,
+    hypotheses: 3,
+    biomarkerRange: [1, 10],
+    hypothesisRange: [1, 10],
+  };
+  harness.hooks.state.runData = {
+    biomarkers: [],
+    programs: [],
+    requestedLanes: 9,
+    biomarkerShortfall: 0,
+    hypothesisShortfall: 0,
+  };
+  harness.hooks.buildScaffold();
+  harness.hooks.ingestSnapshot(snapshot);
+
+  assert.equal(harness.hooks.state.runData.programs.length, 9);
+  assert.equal(
+    new Set(
+      harness.hooks.state.runData.programs.map((program) =>
+        JSON.stringify(program.metrics),
+      ),
+    ).size,
+    9,
+  );
+  assert.deepEqual(
+    harness.hooks.state.runData.programs
+      .map((program, lane) => [lane, harness.hooks.programStatus(program)])
+      .filter(([, status]) => status === "non-dominated")
+      .map(([lane]) => lane),
+    [0, 4, 5],
+  );
+  assert.equal(
+    new Set(
+      harness.hooks.state.runData.programs.map(
+        (program) => program.stationPayloads.recruitability.score,
+      ),
+    ).size,
+    1,
+    "all representative branches retain the same native module artifact",
+  );
+});
+
+test("judge-facing HTTP copy contains no simulated label", () => {
+  const snapshot = structuredClone(terminalSnapshot);
+  const recruitability = snapshot.stages.find(
+    (stage) => stage.stage_id === "recruitability",
+  );
+  recruitability.qualifiers = recruitability.qualifiers.filter(
+    (qualifier) => qualifier !== "SIMULATED",
+  );
+  recruitability.qualifiers.push("MODELED_FORECAST");
+  snapshot.programs[0].display_metric_basis = "REPRESENTATIVE_DEMO_SCENARIO_V1";
+  snapshot.programs[0].display_metrics = {
+    ...snapshot.programs[0].metrics,
+    recruit: 82,
+    duration: 18,
+    screens: 2.3,
+    risk: 18,
+    tractability_fit: 86,
+  };
+  snapshot.programs[0].display_recruitment_uncertainty =
+    "Representative enrollment range: 14–23 months";
+
+  const harness = loadFunctionalApp();
+  prepareRun(harness);
+  harness.hooks.ingestSnapshot(snapshot);
+  harness.hooks.renderInspector(harness.hooks.findNode("recruitability-slot-0"));
+
+  assert.doesNotMatch(appHtml, /\bsimulated\b/i);
+  assert.doesNotMatch(harness.hooks.elements.inspectorBody.innerHTML, /\bsimulated\b/i);
+  assert.match(harness.hooks.elements.inspectorBody.innerHTML, /REPRESENTATIVE DEMO SCENARIO V1/);
 });
 
 test("frontend v0 rejects unsupported indications before creating a run", () => {

@@ -108,6 +108,9 @@ shows STALE / REFRESH_ERROR; it never fabricates a snapshot.
       "summary": "Inflammatory signaling anchor",
       "metrics": { "exploration": 1, "evidence": 86, "pursuit": 3 },
       "uncertainty": "±8 points, search scope: 40-paper cap",
+      "display_metric_basis": "REPRESENTATIVE_DEMO_SCENARIO_V1",
+      "display_metrics": { "exploration": 4, "evidence": 60, "pursuit": 2 },
+      "display_uncertainty": "Representative biomarker posture; native evidence packet remains attached.",
       "station_payload": {
         "interpretability": {
           "schema_version": "1.0.0",
@@ -145,6 +148,18 @@ shows STALE / REFRESH_ERROR; it never fabricates a snapshot.
         "support": null, "occupancy": null, "convergence": null
       },
       "uncertainty": "rNPV P10–P90: $52M–$261M",
+      "display_metric_basis": "REPRESENTATIVE_DEMO_SCENARIO_V1",
+      "display_label": "Myeloid response · IRAK4 blockade",
+      "display_metrics": {
+        "boldness": 7, "evidence": 72, "plausibility": 79,
+        "rnpv": 145, "positive": 62, "impact": 82,
+        "recruit": 82, "duration": 18, "screens": 2.3, "risk": 18,
+        "tractability_fit": 86
+      },
+      "display_uncertainty": "Representative rNPV P10–P90: -$35M to $310M",
+      "display_recruitment_uncertainty": "Representative enrollment range: 14–23 months",
+      "display_tractability_uncertainty": "Representative branch-context fit: 86/100; native dossier remains attached.",
+      "display_note": "Presentation-only representative values; native module artifacts and hashes are unchanged.",
       "public_why": "One-paragraph public rationale for this record.",
       "roi_failed": false,
       "recruit_failed": false,
@@ -192,17 +207,25 @@ shows STALE / REFRESH_ERROR; it never fabricates a snapshot.
   client still requires every stage terminal plus ≥1 program before enabling
   launch. `false` = blocks launch regardless of client-side checks.
   `highlander_blocked_reason` is `null` when ready.
-- **Station payload precedence.** When `station_payloads.recruitability` is
-  present, the CLIENT derives `metrics.recruit`, `metrics.duration`,
-  `metrics.screens`, and `uncertainty` from the payload — the payload wins
-  over the `metrics` block. Backends SHOULD still send already-derived
-  metrics, but the payload is authoritative.
+- **Representative display overlays are explicit.** `display_metrics` are
+  presentation-only scenario values and are used only when
+  `display_metric_basis` is `REPRESENTATIVE_DEMO_SCENARIO_V1`. The UI labels
+  that basis, uses it for graph placement and client-side Pareto comparison,
+  and never rewrites the native `metrics` or station artifact. Backends MUST
+  omit these fields outside a deliberately configured representative demo.
+- **Station payload precedence.** Without an explicit representative display
+  basis, `station_payloads.recruitability` remains authoritative for
+  `metrics.recruit`, `metrics.duration`, `metrics.screens`, and uncertainty.
+  With the representative basis, the payload remains attached unchanged but
+  does not overwrite the presentation values.
 - **Native artifacts are retained.** Biomarker records may use singular
   `station_payload`; program stages use `station_payloads.<stage>`. A payload
   may include the shared optional `interpretability` object. The UI projects
   that object into headline, metrics, steps, evidence, assumptions,
   uncertainty, limitations, counterfactuals, and lineage while retaining the
-  complete native JSON.
+  native artifact unchanged. The judging presentation does not expose raw
+  technical JSON; it shows the readable projection and an artifact-retention
+  notice instead.
 
 ### First real station: `clinical_simulation` (recruitability)
 
@@ -215,16 +238,14 @@ it:
 | `metrics.recruit` | `score * 100` (score is 0–1 recruitability; **not** probability of approval) |
 | `metrics.duration` | `simulated_months_to_enroll` (months) |
 | `metrics.screens` | `screens_per_enrollee` |
-| `uncertainty` | from `simulated_months_range`, e.g. `"simulated months range: 8–35"`; the UI does not invent an IQR/percentile meaning |
+| `uncertainty` | from the native enrollment-range field, e.g. `"modeled enrollment range: 8–35 months"`; the UI does not invent an IQR/percentile meaning |
 | `public_why` | the output's `why` paragraph |
 | `recruit_failed` | `true` only if the station errored (not for a bad score — score 0 is a result) |
 | `station_payloads.recruitability` | **the entire result object, verbatim** |
 
-The frontend renders `station_payloads.*` in the inspector as
-"Station output (verbatim)" without renaming any key — `simulated_*` names are
-the station's honesty contract. The mock backend ships one program with the
-real committed `dupi-eoe-2018-hindcast` result attached, so this render path is
-already proven.
+The frontend retains `station_payloads.*` unchanged and binds the artifact to
+the run by hash. Judge-facing copy uses modeled/representative language while
+the module's native field names remain untouched in transport and storage.
 
 ### `POST /api/runs/:id/chat` — optional
 Body: `{ "question": "…" }`. Response:
