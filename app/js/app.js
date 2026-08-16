@@ -1,12 +1,18 @@
     import { createHttpBackend } from "./backend-http.js";
+    import {
+      interpretabilityView,
+      normalizeStageTruth,
+      resolveBackendBase,
+      stationPayloadFor
+    } from "./snapshot-contract.js";
 
     // Backend selection: http (default — the served link is the production-shaped
-    // build; real run API per ../API-CONTRACT.md, base http://localhost:8787 or
+    // build; real run API per ../API-CONTRACT.md, same-origin by default or
     // ?base=…) or ?backend=mock (in-page deterministic demo, zero network).
     var BOOT = (function () {
       var params = new URLSearchParams(window.location.search);
       var mode = params.get("backend") === "mock" ? "mock" : "http";
-      var base = params.get("base") || "http://localhost:8787";
+      var base = resolveBackendBase(window.location.search, window.location.origin);
       return { mode: mode, base: base, http: mode === "http" ? createHttpBackend(base) : null };
     }());
 
@@ -220,6 +226,10 @@
           .replace(/'/g, "&#039;");
       }
 
+      function normalizeDisplayText(value) {
+        return typeof value === "string" ? value.replace(/\$-/g, "-$") : value;
+      }
+
       function announce(message) {
         elements.live.textContent = "";
         window.requestAnimationFrame(function () {
@@ -266,8 +276,15 @@
         var indication = elements.indication.value.trim();
         var indicationError = document.getElementById("indication-error");
         var indicationValid = indication.length > 0;
+        if (BOOT.mode === "http" && indication.toLowerCase() !== "rheumatoid arthritis") {
+          indicationValid = false;
+        }
         elements.indication.setAttribute("aria-invalid", indicationValid ? "false" : "true");
-        indicationError.textContent = indicationValid ? "" : "Enter a clinical indication; whitespace alone is not valid.";
+        indicationError.textContent = indicationValid
+          ? ""
+          : (BOOT.mode === "http"
+            ? "This judging build supports Rheumatoid arthritis only."
+            : "Enter a clinical indication; whitespace alone is not valid.");
 
         var biomarkers = numberFieldState(elements.maxBiomarkers, "Maximum biomarkers");
         var papers = numberFieldState(elements.maxPapers, "Maximum literature papers");
@@ -281,7 +298,7 @@
           elements.branchPreview.textContent = "Enter valid ceilings to preview requested capacity.";
         }
         elements.paperPreview.textContent = papers.valid
-          ? "The illustrative mapper may inspect up to " + papers.value + " paper record" + (papers.value === 1 ? "" : "s") + ". Returned counts may be lower."
+          ? (BOOT.mode === "http" ? "The orchestrated evidence stage may inspect up to " : "The illustrative mapper may inspect up to ") + papers.value + " paper record" + (papers.value === 1 ? "" : "s") + ". Returned counts may be lower."
           : "The literature ceiling is invalid; no count has been assumed.";
         elements.runButton.disabled = !valid || state.submitting;
         return {
@@ -331,7 +348,12 @@
         if (typeof payload.score === "number") program.metrics.recruit = Math.round(payload.score * 100);
         if (typeof payload.simulated_months_to_enroll === "number") program.metrics.duration = payload.simulated_months_to_enroll;
         if (typeof payload.screens_per_enrollee === "number") program.metrics.screens = payload.screens_per_enrollee;
-        if (Array.isArray(payload.simulated_months_range)) program.uncertainty = "simulated months IQR: " + payload.simulated_months_range[0] + "–" + payload.simulated_months_range[1];
+        if (Array.isArray(payload.simulated_months_range)) {
+          program.recruitmentUncertainty = "simulated months range: " + payload.simulated_months_range[0] + "–" + payload.simulated_months_range[1];
+          if (!program.uncertainty || program.uncertainty === "not supplied") {
+            program.uncertainty = program.recruitmentUncertainty;
+          }
+        }
       }
 
       function buildRunData(snapshot) {
@@ -444,6 +466,7 @@
           execution: null,
           resultBasis: null,
           runtime: null,
+          outputOrigin: null,
           metrics: {},
           uncertainty: null,
           reason: null,
@@ -463,10 +486,11 @@
           execution: "COMPLETE",
           resultBasis: "USER INPUT",
           runtime: "STATIC SNAPSHOT",
+          outputOrigin: "USER_INPUT",
           metrics: {},
           uncertainty: "Not applicable",
           reason: null,
-          metadata: { summary: "Immutable clinical indication submitted for this mock run." }
+          metadata: { summary: "Immutable clinical indication submitted for this run." }
         }];
 
         for (var b = 0; b < state.snapshot.biomarkers; b += 1) {
@@ -493,12 +517,19 @@
         elements.connectors.setAttribute("viewBox", "0 0 " + width + " " + GRAPH_GEOMETRY.canvasHeight);
       }
 
-      // Presentation only: start a fresh run with the indication root centered,
-      // so narrower viewports don't open onto empty canvas left of the tree.
-      function centerGraphOnRoot() {
+      // Presentation only: before results, center the requested-capacity root.
+      // Once a real lineage exists, center its first bound lane instead so the
+      // record cannot remain hidden behind the sticky metric rail.
+      function centerGraphOnActiveLineage() {
         var scroller = elements.graphScroller;
+        var targetX = rootX() + GRAPH_GEOMETRY.nodeWidth / 2;
+        if (state.runData && state.runData.programs && state.runData.programs.length) {
+          targetX = laneX(state.runData.programs[0].lane) + GRAPH_GEOMETRY.nodeWidth / 2;
+        } else if (state.runData && state.runData.biomarkers && state.runData.biomarkers.length) {
+          targetX = groupX(state.runData.biomarkers[0].slot) + GRAPH_GEOMETRY.nodeWidth / 2;
+        }
         scroller.scrollTop = 0;
-        scroller.scrollLeft = Math.max(0, rootX() + GRAPH_GEOMETRY.nodeWidth / 2 - scroller.clientWidth / 2);
+        scroller.scrollLeft = Math.max(0, targetX - scroller.clientWidth / 2);
       }
 
       function findNode(id) {
@@ -533,14 +564,15 @@
           node.kind = "pending";
           node.execution = "RUNNING";
           node.resultBasis = "AWAITING RESULT";
-          node.runtime = stage === "simulation" ? "NOT WIRED" : "LOCAL TARGET / MOCK UI";
+          node.runtime = BOOT.mode === "http" ? "BACKEND SNAPSHOT" : (stage === "simulation" ? "NOT WIRED" : "LOCAL TARGET / MOCK UI");
+          node.outputOrigin = BOOT.mode === "http" ? "NOT_RUN" : "MOCK";
           node.metrics = {};
           node.uncertainty = "Pending; no value placed on the metric axis.";
           if (stage === "biomarker") node.label = biomarker.label;
           if (stage === "hypothesis") node.label = program.label;
           if (stage === "roi") node.label = "Economics · " + program.short;
           if (stage === "recruitability") node.label = "Recruitment · " + program.short;
-          if (stage === "simulation") node.label = "Atomistic · " + program.short;
+          if (stage === "simulation") node.label = (BOOT.mode === "http" ? "Tractability · " : "Atomistic · ") + program.short;
         });
       }
 
@@ -565,6 +597,29 @@
         });
       }
 
+      function applyBackendStageTruth(node, stage) {
+        if (BOOT.mode !== "http" || !state.runData || !state.runData.stageRows) return;
+        var stageRow = state.runData.stageRows[stage];
+        if (!stageRow) return;
+        var truth = normalizeStageTruth(stageRow, {
+          execution: node.execution,
+          outputOrigin: node.outputOrigin,
+          resultBasis: node.resultBasis,
+          runtime: node.runtime,
+          reason: node.reason
+        });
+        node.execution = truth.moduleExecution;
+        node.outputOrigin = truth.outputOrigin;
+        node.resultBasis = truth.resultBasis;
+        node.runtime = truth.runtimeMaturity;
+        node.reason = truth.reasonCode;
+        node.metadata.presentationStatus = truth.presentationStatus;
+        node.metadata.outputOrigin = truth.outputOrigin;
+        node.metadata.reasonCode = truth.reasonCode;
+        node.metadata.qualifiers = truth.qualifiers;
+        node.metadata.warnings = Array.isArray(stageRow.warnings) ? stageRow.warnings.slice() : [];
+      }
+
       function bindStage(stage) {
         var httpMode = BOOT.mode === "http";
         state.nodes.forEach(function (node) {
@@ -580,6 +635,7 @@
             node.execution = "COMPLETE";
             node.resultBasis = httpMode ? "BACKEND-REPORTED" : "ILLUSTRATIVE PROXY";
             node.runtime = httpMode ? "BACKEND SNAPSHOT" : "TARGET ADAPTER";
+            node.outputOrigin = httpMode ? "UNREPORTED" : "MOCK";
             node.metrics = biomarker.metrics;
             node.uncertainty = biomarker.uncertainty;
             node.metadata.summary = biomarker.summary;
@@ -589,19 +645,21 @@
             node.execution = "COMPLETE";
             node.resultBasis = httpMode ? "BACKEND-REPORTED" : "ILLUSTRATIVE PROXY";
             node.runtime = httpMode ? "BACKEND SNAPSHOT" : "NOT WIRED";
+            node.outputOrigin = httpMode ? "UNREPORTED" : "MOCK";
             node.metrics = {
               boldness: program.metrics.boldness,
               evidence: program.metrics.evidence,
               plausibility: program.metrics.plausibility
             };
-            node.uncertainty = httpMode ? (program.uncertainty || "not supplied") : "Proxy scores are ordinal product fixtures.";
-            node.metadata.summary = "Illustrative terminal hypothesis; no generator module was called.";
+            node.uncertainty = httpMode ? "No calibrated hypothesis interval supplied; inspect native provenance." : "Proxy scores are ordinal product fixtures.";
+            node.metadata.summary = httpMode ? "Hypothesis record returned by the orchestrated run." : "Illustrative terminal hypothesis; no generator module was called.";
           }
           if (stage === "roi") {
             node.label = "Economics · " + program.short;
             node.execution = program.roiFailed ? "FAILED" : "COMPLETE";
             node.resultBasis = program.roiFailed ? "MISSING" : (httpMode ? "MODELED (backend)" : "SYNTHETIC MODELED");
             node.runtime = httpMode ? "BACKEND SNAPSHOT" : "LOCAL MODULE TARGET";
+            node.outputOrigin = httpMode ? "UNREPORTED" : "MOCK";
             node.metrics = {
               rnpv: program.metrics.rnpv,
               positive: program.metrics.positive,
@@ -610,43 +668,60 @@
             node.uncertainty = program.uncertainty;
             node.reason = program.roiFailed ? "MOCK_ECONOMICS_FAILURE · value remains missing" : null;
             node.metadata.overflow = program.overflowRnpv;
-            node.metadata.summary = "Synthetic AnalysisSummary-compatible fields; NOT_DECISION_GRADE.";
+            node.metadata.summary = httpMode ? "Economics result returned by the orchestrated run; inspect basis and qualifiers." : "Synthetic AnalysisSummary-compatible fields; NOT_DECISION_GRADE.";
           }
           if (stage === "recruitability") {
             node.label = "Recruitment · " + program.short;
             node.execution = program.recruitFailed ? "FAILED" : "COMPLETE";
             node.resultBasis = program.recruitFailed ? "MISSING" : (httpMode ? "SIMULATED (backend)" : "SIMULATED PROXY");
             node.runtime = httpMode ? "BACKEND SNAPSHOT" : "LOCAL MODULE TARGET";
+            node.outputOrigin = httpMode ? "UNREPORTED" : "MOCK";
             node.metrics = {
               recruit: program.metrics.recruit,
               duration: program.metrics.duration,
               screens: program.metrics.screens,
               risk: program.metrics.risk
             };
-            node.uncertainty = program.recruitFailed ? "No numeric output returned." : (httpMode ? (program.uncertainty || "not supplied") : "Illustrative duration range ±4 months.");
+            node.uncertainty = program.recruitFailed ? "No numeric output returned." : (httpMode ? (program.recruitmentUncertainty || "not supplied") : "Illustrative duration range ±4 months.");
             node.reason = program.recruitFailed ? "MOCK_FORECAST_FAILURE · sibling branches continued" : null;
-            node.metadata.summary = "Synthetic RecruitabilityResult-compatible fields.";
+            node.metadata.summary = httpMode ? "Recruitability result returned by the orchestrated run; inspect origin and limitations." : "Synthetic RecruitabilityResult-compatible fields.";
           }
           if (stage === "simulation") {
-            node.label = "Atomistic · " + program.short;
-            node.execution = "SKIPPED";
-            node.resultBasis = program.notAmenable ? "NO RESULT" : "NOT WIRED";
-            node.runtime = "NOT WIRED";
+            node.label = (httpMode ? "Tractability · " : "Atomistic · ") + program.short;
+            var hasSimulationPayload = Boolean(program.stationPayloads && program.stationPayloads.simulation);
+            node.execution = httpMode ? (hasSimulationPayload ? "COMPLETE" : "SKIPPED") : "SKIPPED";
+            node.resultBasis = httpMode ? (hasSimulationPayload ? "BACKEND-REPORTED" : "MISSING") : (program.notAmenable ? "NO RESULT" : "NOT WIRED");
+            node.runtime = httpMode ? "BACKEND SNAPSHOT" : "NOT WIRED";
+            node.outputOrigin = httpMode ? (hasSimulationPayload ? "UNREPORTED" : "NOT_RUN") : "NOT_RUN";
             node.metrics = { support: null, occupancy: null, convergence: null };
-            node.uncertainty = "Not available; missing values stay on the shelf.";
-            node.reason = program.notAmenable
+            node.uncertainty = httpMode ? "No scalar atomistic metric is imputed; inspect the native tractability interpretation." : "Not available; missing values stay on the shelf.";
+            node.reason = httpMode ? null : (program.notAmenable
               ? "NOT_AMENABLE · resolving evidence would be an experimentally supported binding mechanism"
-              : "MODULE_NOT_WIRED";
-            node.metadata.summary = "No atomistic capability was called by this standalone mockup.";
+              : "MODULE_NOT_WIRED");
+            node.metadata.summary = httpMode
+              ? "The orchestrator supplied a tractability station record. No scalar atomistic score is imputed when the module keeps its evidence axes separate."
+              : "No atomistic capability was called by this standalone mockup.";
           }
+          applyBackendStageTruth(node, stage);
           // When a real station produced this record, its verbatim output rides along.
           // The payload never overwrites execution status or a failure/skip reason;
           // provenance labels upgrade only for records that actually resolved.
-          var payload = program && program.stationPayloads ? program.stationPayloads[stage] : null;
+          var payload = null;
+          if (stage === "biomarker") {
+            payload = stationPayloadFor(biomarker, stage);
+            if (!payload) {
+              var biomarkerProgram = state.runData.programs.find(function (candidate) {
+                return candidate.biomarkerSlot === node.metadata.slot;
+              });
+              payload = stationPayloadFor(biomarkerProgram, stage);
+            }
+          } else {
+            payload = stationPayloadFor(program, stage);
+          }
           if (payload) {
             node.metadata.stationPayload = payload;
             node.metadata.summary = "Verbatim station output attached (input id: " + (payload.input && payload.input.id ? payload.input.id : "unknown") + "). Displayed keys are never renamed.";
-            if (node.execution !== "FAILED" && node.execution !== "SKIPPED" && node.execution !== "NOT_AMENABLE") {
+            if (!httpMode && node.execution !== "FAILED" && node.execution !== "SKIPPED" && node.execution !== "NOT_AMENABLE") {
               node.resultBasis = "MODELED · VERBATIM STATION OUTPUT";
               node.runtime = "STATION ATTACHED";
             }
@@ -677,7 +752,9 @@
           return node.kind === "pending" ? "Pending · shelf" : "Missing · shelf";
         }
         if (definition.names) return definition.names[Math.round(value)] + " · ordinal";
-        if (state.metrics[node.stage] === "rnpv") return "$" + value + "M · modeled";
+        if (state.metrics[node.stage] === "rnpv") {
+          return (value < 0 ? "-$" + Math.abs(value) : "$" + value) + "M · modeled";
+        }
         if (state.metrics[node.stage] === "positive" || state.metrics[node.stage] === "occupancy" || state.metrics[node.stage] === "convergence") return value + "% · " + definition.unit.replace("% ", "");
         if (state.metrics[node.stage] === "duration") return value + " months · simulated";
         if (state.metrics[node.stage] === "screens") return value.toFixed(1) + "× · simulated";
@@ -756,7 +833,7 @@
             if (node.metadata.retired) nodeElement.classList.add("retired");
           } else {
             var accessibleValue = formatMetric(node);
-            nodeElement.setAttribute("aria-label", node.label + "; " + node.stage + "; " + accessibleValue + "; execution " + node.execution + "; result basis " + node.resultBasis + "; runtime " + node.runtime + "; uncertainty " + (node.uncertainty || "not supplied"));
+            nodeElement.setAttribute("aria-label", node.label + "; " + node.stage + "; " + accessibleValue + "; module execution " + node.execution + "; stage presentation " + (node.metadata.presentationStatus || node.execution) + "; output origin " + (node.outputOrigin || "unreported") + "; result basis " + node.resultBasis + "; runtime " + node.runtime + "; uncertainty " + (node.uncertainty || "not supplied"));
             nodeElement.addEventListener("mouseenter", function () { setPreview(node.id); });
             nodeElement.addEventListener("mouseleave", function () { clearPreview(node.id); });
             nodeElement.addEventListener("focus", function () { setPreview(node.id); });
@@ -775,7 +852,9 @@
           var badges = "";
           if (node.kind !== "scaffold") {
             var executionClass = String(node.execution || "").toLowerCase();
-            badges = '<div class="node-badges"><span class="badge ' + executionClass + '">' + escapeHTML(node.execution) + '</span><span class="badge proxy">' + escapeHTML(node.resultBasis) + '</span><span class="badge">' + escapeHTML(node.runtime) + "</span></div>";
+            badges = BOOT.mode === "http"
+              ? '<div class="node-badges http-truth"><span class="badge ' + executionClass + '">' + escapeHTML(node.execution) + '</span><span class="badge proxy">' + escapeHTML(node.resultBasis) + '</span><span class="badge">' + escapeHTML(node.outputOrigin || "UNREPORTED") + '</span><span class="badge">' + escapeHTML(node.runtime) + "</span></div>"
+              : '<div class="node-badges"><span class="badge ' + executionClass + '">' + escapeHTML(node.execution) + '</span><span class="badge proxy">' + escapeHTML(node.resultBasis) + '</span><span class="badge">' + escapeHTML(node.runtime) + "</span></div>";
           }
           var nodeDetail = node.kind === "scaffold"
             ? (node.metadata.retired ? "Unused requested capacity · no scientific record created." : "Requested capacity · identity has not been created.")
@@ -888,6 +967,65 @@
         }
       }
 
+      function interpretabilityItems(value) {
+        if (Array.isArray(value)) return value;
+        if (value && typeof value === "object") return [value];
+        return [];
+      }
+
+      function interpretabilityText(item, fields) {
+        if (item === null || item === undefined) return "Not supplied";
+        if (typeof item !== "object") return String(item);
+        var parts = [];
+        fields.forEach(function (field) {
+          var value = item[field];
+          if (value === null || value === undefined || value === "") return;
+          if (Array.isArray(value)) value = value.join(", ");
+          if (typeof value === "object") value = JSON.stringify(value);
+          parts.push(String(value));
+        });
+        return parts.length ? parts.join(" · ") : JSON.stringify(item);
+      }
+
+      function interpretabilityList(items, fields) {
+        var values = interpretabilityItems(items);
+        if (!values.length) return '<p class="micro">Not supplied by this module.</p>';
+        return "<ul>" + values.slice(0, 6).map(function (item) {
+          return "<li>" + escapeHTML(interpretabilityText(item, fields)) + "</li>";
+        }).join("") + "</ul>";
+      }
+
+      // One renderer for every module's optional interpretability 1.0 object.
+      // Native JSON remains available below it; this is only a compact projection.
+      function renderInterpretability(interpretability) {
+        var supplied = Boolean(interpretability && typeof interpretability === "object" && !Array.isArray(interpretability));
+        var raw = supplied
+          ? interpretability
+          : {};
+        var view = supplied ? interpretabilityView({ interpretability: raw }) : null;
+        var headline = view ? view.headline : {
+          title: "Interpretability unavailable",
+          result: "UNREPORTED",
+          plainLanguage: "This module did not emit the shared interpretability object.",
+          status: "UNREPORTED",
+          basis: []
+        };
+        var uncertainty = raw.uncertainty && typeof raw.uncertainty === "object" ? raw.uncertainty : {};
+        var uncertaintySummary = [uncertainty.method, uncertainty.draws !== null && uncertainty.draws !== undefined ? uncertainty.draws + " draws" : null, uncertainty.seed !== null && uncertainty.seed !== undefined ? "seed " + uncertainty.seed : null].filter(Boolean).join(" · ") || "Not supplied by this module.";
+        var schemaVersion = raw.schema_version || "unreported";
+        return '<div class="interpretability-view" data-interpretability-view="' + escapeHTML(schemaVersion) + '">' +
+          '<section data-interpretability-section="headline"><h4>' + escapeHTML(headline.title) + '</h4><p><strong>' + escapeHTML(headline.result) + " · " + escapeHTML(headline.status) + '</strong></p><p>' + escapeHTML(headline.plainLanguage) + '</p><p class="micro">Basis: ' + escapeHTML(headline.basis.length ? headline.basis.join(" + ") : "not supplied") + "</p></section>" +
+          '<details class="inspector-section" open data-interpretability-section="metrics"><summary>Key metrics</summary>' + interpretabilityList(raw.metrics, ["label", "display", "meaning"]) + "</details>" +
+          '<details class="inspector-section" data-interpretability-section="steps"><summary>Calculation steps</summary>' + interpretabilityList(raw.steps, ["label", "method", "formula", "result"]) + "</details>" +
+          '<details class="inspector-section" data-interpretability-section="evidence"><summary>Evidence</summary>' + interpretabilityList(raw.evidence, ["claim", "source_id", "grade"]) + "</details>" +
+          '<details class="inspector-section" data-interpretability-section="assumptions"><summary>Assumptions</summary>' + interpretabilityList(raw.assumptions, ["path", "value", "unit", "basis"]) + "</details>" +
+          '<details class="inspector-section" data-interpretability-section="uncertainty"><summary>Uncertainty</summary><p>' + escapeHTML(uncertaintySummary) + "</p>" + interpretabilityList(uncertainty.limitations, ["message"]) + "</details>" +
+          '<details class="inspector-section" open data-interpretability-section="limitations"><summary>Limitations</summary>' + interpretabilityList(raw.limitations, ["code", "severity", "message"]) + "</details>" +
+          '<details class="inspector-section" data-interpretability-section="counterfactuals"><summary>Counterfactuals</summary>' + interpretabilityList(raw.counterfactuals, ["change", "result", "meaning"]) + "</details>" +
+          '<details class="inspector-section" data-interpretability-section="lineage"><summary>Lineage</summary>' + interpretabilityList(raw.lineage, ["output_path", "input_paths", "transformation"]) + "</details>" +
+        "</div>";
+      }
+
       function evidenceCopy(node) {
         if (node.stage === "biomarker") return "Illustrative supporting findings: 6; contradictory findings: 2; shared literature cap applies across the run.";
         if (node.stage === "hypothesis") return "Illustrative synthesis cites the parent biomarker record and two mock finding IDs. No generator or mapper was called.";
@@ -900,11 +1038,8 @@
       function renderInspector(node) {
         if (!node) return;
         var definition = metricDefinition(node);
-        var warning = node.resultBasis === "NOT WIRED" || node.runtime === "NOT WIRED" || node.resultBasis === "MISSING" || node.resultBasis === "NO RESULT"
-          ? '<div class="state-warning">This record has a terminal gap. ' + escapeHTML(node.reason || "A target module is not wired.") + " It must not be read as positive or negative scientific evidence.</div>"
-          : '<div class="state-warning">ILLUSTRATIVE MOCK DATA · inspect structure and handoffs, not scientific validity.</div>';
+        var httpMode = BOOT.mode === "http";
         var value = formatMetric(node);
-        var definitionCopy = definition ? definition.label + " · " + definition.unit + " · domain " + definition.domain[0] + "–" + definition.domain[1] + ". " + definition.basis : "Fixed submitted root.";
         var program = findProgramForNode(node);
         var rationale = program ? program.publicWhy : (node.metadata.summary || "This record anchors the available public lineage.");
         var parent = node.parentId ? findNode(node.parentId) : null;
@@ -912,9 +1047,54 @@
         var interaction = state.previewId === node.id ? "SELECTED + PREVIEWED" : "SELECTED";
         var payloadSection = "";
         if (node.metadata.stationPayload) {
-          payloadSection = '<details class="inspector-section" open><summary>Station output (verbatim)</summary><p class="micro">Key names are the station’s own honesty contract — simulated_* stays simulated_*; nothing is renamed for display, and score is not a probability of approval.</p><pre class="mono" style="overflow:auto;max-height:260px;background:#f0eee5;padding:9px;border-radius:8px;font-size:9px;white-space:pre-wrap;">' + escapeHTML(JSON.stringify(node.metadata.stationPayload, null, 2)) + "</pre></details>";
+          payloadSection = httpMode
+            ? '<details class="inspector-section" data-inspector-section="station-json"><summary>Station output (verbatim JSON)</summary><p class="micro">This is the complete native station payload. Key names and values are not renamed or rewritten for display.</p><pre class="mono" style="overflow:auto;max-height:260px;background:#f0eee5;padding:9px;border-radius:8px;font-size:9px;white-space:pre-wrap;">' + escapeHTML(JSON.stringify(node.metadata.stationPayload, null, 2)) + "</pre></details>"
+            : '<details class="inspector-section" open><summary>Station output (verbatim)</summary><p class="micro">Key names are the station’s own honesty contract — simulated_* stays simulated_*; nothing is renamed for display, and score is not a probability of approval.</p><pre class="mono" style="overflow:auto;max-height:260px;background:#f0eee5;padding:9px;border-radius:8px;font-size:9px;white-space:pre-wrap;">' + escapeHTML(JSON.stringify(node.metadata.stationPayload, null, 2)) + "</pre></details>";
         }
 
+        if (httpMode) {
+          var warnings = Array.isArray(node.metadata.warnings) ? node.metadata.warnings : [];
+          var qualifiers = Array.isArray(node.metadata.qualifiers) ? node.metadata.qualifiers : [];
+          var origin = node.metadata.outputOrigin || node.outputOrigin || "UNREPORTED";
+          var liveDefinition = definition
+            ? definition.label + " · " + definition.unit + " · display domain " + definition.domain[0] + "–" + definition.domain[1] + "."
+            : "Backend-provided run record.";
+          if (node.stage === "simulation") liveDefinition = "Native tractability dossier; no scalar atomistic metric is imputed.";
+          var truthMessage = origin === "DEMO_FALLBACK"
+            ? "Module execution " + node.execution + "; the orchestrator supplied validated DEMO_FALLBACK output. This is not a live result."
+            : origin === "CACHED"
+              ? "Module execution " + node.execution + "; the orchestrator supplied validated CACHED output."
+              : "Backend-reported " + origin.replace(/_/g, " ") + " result.";
+          if (warnings.length) truthMessage += " " + warnings.join(" · ");
+          var interpretability = node.metadata.stationPayload && node.metadata.stationPayload.interpretability;
+          var readableInterpretability = renderInterpretability(interpretability);
+
+          elements.inspectorHeading.textContent = node.label;
+          elements.inspectorSubtitle.textContent = node.stage + " · " + node.id;
+          elements.collapsedIdentity.textContent = node.label + " · " + node.execution;
+          elements.inspectorBody.innerHTML =
+            '<div class="state-warning">' + escapeHTML(truthMessage) + "</div>" +
+            '<div class="inspector-status-grid">' +
+              '<div class="status-card"><span>Module execution</span><strong>' + escapeHTML(node.execution || "UNREPORTED") + "</strong></div>" +
+              '<div class="status-card"><span>Output origin</span><strong>' + escapeHTML(origin.replace(/_/g, " ")) + "</strong></div>" +
+              '<div class="status-card"><span>Result basis</span><strong>' + escapeHTML(node.resultBasis || "UNREPORTED") + "</strong></div>" +
+              '<div class="status-card"><span>Runtime maturity</span><strong>' + escapeHTML(node.runtime || "UNREPORTED") + "</strong></div>" +
+              '<div class="status-card"><span>UI freshness</span><strong>' + escapeHTML(state.freshness.toUpperCase()) + "</strong></div>" +
+              '<div class="status-card"><span>Stage result</span><strong>' + escapeHTML(node.metadata.presentationStatus || node.execution || "UNREPORTED") + "</strong></div>" +
+            "</div>" +
+            '<div class="primary-result"><span>Active display value</span><strong>' + escapeHTML(value) + '</strong><p>' + escapeHTML(liveDefinition) + " Uncertainty: " + escapeHTML(node.uncertainty || "not supplied") + ".</p></div>" +
+            readableInterpretability +
+            '<details class="inspector-section" open><summary>Run qualifications</summary><p><strong>Reason:</strong> ' + escapeHTML(node.reason || "No stage reason code reported.") + '</p><p><strong>Qualifiers:</strong> ' + escapeHTML(qualifiers.length ? qualifiers.join(" · ") : "none reported") + '</p><p><strong>Warnings:</strong> ' + escapeHTML(warnings.length ? warnings.join(" · ") : "none reported") + "</p></details>" +
+            '<details class="inspector-section"><summary>Lineage & audit</summary><ul><li>Parent: ' + escapeHTML(parent ? parent.label : "none · root") + "</li><li>Direct descendants: " + childCount + "</li><li>Output origin: " + escapeHTML(origin) + "</li><li>Timestamp: " + escapeHTML(state.lastUpdated || "awaiting update") + "</li><li>Hash: " + escapeHTML(program ? program.hash : "unreported") + "</li></ul></details>" +
+            payloadSection;
+          return;
+        }
+
+        var terminalGap = node.resultBasis === "NOT WIRED" || node.runtime === "NOT WIRED" || node.resultBasis === "MISSING" || node.resultBasis === "NO RESULT";
+        var warning = terminalGap
+          ? '<div class="state-warning">This record has a terminal gap. ' + escapeHTML(node.reason || "A target module is not wired.") + " It must not be read as positive or negative scientific evidence.</div>"
+          : '<div class="state-warning">ILLUSTRATIVE MOCK DATA · inspect structure and handoffs, not scientific validity.</div>';
+        var definitionCopy = definition ? definition.label + " · " + definition.unit + " · domain " + definition.domain[0] + "–" + definition.domain[1] + ". " + definition.basis : "Fixed submitted root.";
         elements.inspectorHeading.textContent = node.label;
         elements.inspectorSubtitle.textContent = node.stage + " · " + node.id;
         elements.collapsedIdentity.textContent = node.label + " · " + node.execution;
@@ -1017,7 +1197,15 @@
 
       function translateWire(ws) {
         var biomarkers = (ws.biomarkers || []).map(function (item) {
-          return { slot: item.slot, id: "bio-slot-" + item.slot, label: item.label, summary: item.summary || "", metrics: item.metrics || {}, uncertainty: item.uncertainty || "not supplied" };
+          return {
+            slot: item.slot,
+            id: "bio-slot-" + item.slot,
+            label: item.label,
+            summary: item.summary || "",
+            metrics: item.metrics || {},
+            uncertainty: normalizeDisplayText(item.uncertainty || "not supplied"),
+            stationPayload: stationPayloadFor(item, "biomarker")
+          };
         });
         var programs = (ws.programs || []).map(function (item, index) {
           var metrics = item.metrics || {};
@@ -1036,7 +1224,7 @@
             label: item.label,
             short: item.short_label || item.label,
             metrics: metrics,
-            uncertainty: item.uncertainty || "not supplied",
+            uncertainty: normalizeDisplayText(item.uncertainty || "not supplied"),
             publicWhy: item.public_why || "No public rationale supplied by the backend for this record.",
             roiFailed: Boolean(item.roi_failed),
             recruitFailed: Boolean(item.recruit_failed),
@@ -1049,10 +1237,15 @@
           applyStationDerivations(program);
           return program;
         });
+        var stageRows = {};
+        (ws.stages || []).forEach(function (stage) {
+          if (stage && stage.stage_id) stageRows[stage.stage_id] = stage;
+        });
         var requestedLanes = state.snapshot.biomarkers * state.snapshot.hypotheses;
         return {
           biomarkers: biomarkers,
           programs: programs,
+          stageRows: stageRows,
           requestedLanes: requestedLanes,
           biomarkerShortfall: Math.max(0, state.snapshot.biomarkers - biomarkers.length),
           hypothesisShortfall: Math.max(0, requestedLanes - programs.length)
@@ -1060,12 +1253,14 @@
       }
 
       function ingestSnapshot(ws) {
+        var hadPrograms = Boolean(state.runData && state.runData.programs && state.runData.programs.length);
         state.runData = translateWire(ws);
         var stageIds = STAGES.map(function (stage) { return stage.id; });
         (ws.stages || []).forEach(function (stage) {
           var index = stageIds.indexOf(stage.stage_id);
           if (index === -1) return;
-          var status = stage.execution_status || "QUEUED";
+          var truth = normalizeStageTruth(stage, { execution: "QUEUED" });
+          var status = truth.presentationStatus;
           state.stageStates[index] =
             status === "RUNNING" ? "running" :
             status === "COMPLETE" ? "complete" :
@@ -1077,6 +1272,7 @@
         });
         renderProgress();
         renderGraph();
+        if (!hadPrograms && state.runData.programs.length) centerGraphOnActiveLineage();
         if (state.selectedId && state.inspectorVisible) renderInspector(findNode(state.selectedId));
         var allTerminal = state.stageStates.every(function (item) { return item === "complete" || item === "warning" || item === "failed"; });
         if (allTerminal) {
@@ -1113,7 +1309,7 @@
         renderProgress();
         renderGraph();
         renderReadiness();
-        centerGraphOnRoot();
+        centerGraphOnActiveLineage();
         updateFreshness("Run created on backend; polling snapshots");
         httpPoller = BOOT.http.startPolling(runId, {
           onSnapshot: function (ws) {
@@ -1190,12 +1386,13 @@
       function renderReadiness() {
         var nonterminal = state.stageStates.filter(function (stage) { return stage === "queued" || stage === "running"; }).length;
         var programCount = state.runData ? state.runData.programs.length : 0;
+        var launchName = BOOT.mode === "http" ? "Open client-side comparison" : "Launch Highlander";
         if (!programCount) {
           elements.readinessState.textContent = "BLOCKED · no candidates";
           elements.packetCounts.innerHTML = '<span class="packet-count">0 complete</span><span class="packet-count">0 partial</span><span class="packet-count">0 blocked</span><span class="packet-count">no candidates</span>';
           elements.gapConfirm.classList.remove("visible");
           elements.launchHighlander.disabled = true;
-          elements.launchHighlander.textContent = "Launch Highlander · no candidates";
+          elements.launchHighlander.textContent = launchName + " · no candidates";
           return;
         }
         if (nonterminal > 0) {
@@ -1203,14 +1400,16 @@
           elements.packetCounts.innerHTML = '<span class="packet-count">0 complete</span><span class="packet-count">0 partial</span><span class="packet-count">' + programCount + ' running</span><span class="packet-count">' + nonterminal + " nonterminal stages</span>";
           elements.gapConfirm.classList.remove("visible");
           elements.launchHighlander.disabled = true;
-          elements.launchHighlander.textContent = "Launch Highlander · blocked";
+          elements.launchHighlander.textContent = launchName + " · blocked";
           return;
         }
         elements.readinessState.textContent = "READY WITH TERMINAL GAPS · no nonterminal records";
         elements.packetCounts.innerHTML = '<span class="packet-count">0 complete</span><span class="packet-count">' + programCount + ' partial</span><span class="packet-count">0 blocked</span><span class="packet-count">0 nonterminal</span>';
         elements.gapConfirm.classList.add("visible");
         elements.launchHighlander.disabled = !elements.gapConfirmInput.checked;
-        elements.launchHighlander.textContent = elements.gapConfirmInput.checked ? "Launch Highlander →" : "Acknowledge gaps to launch";
+        elements.launchHighlander.textContent = elements.gapConfirmInput.checked
+          ? launchName + " →"
+          : (BOOT.mode === "http" ? "Acknowledge gaps to continue" : "Acknowledge gaps to launch");
       }
 
       function resetDemo() {
@@ -1237,7 +1436,7 @@
         renderProgress();
         renderGraph();
         renderReadiness();
-        centerGraphOnRoot();
+        centerGraphOnActiveLineage();
         updateFreshness("Illustrative arrivals restarted");
         setTimer(function () { startStage(0); }, 400);
       }
@@ -1281,7 +1480,9 @@
         document.getElementById("graph-snapshot").textContent = "up to " + state.snapshot.biomarkers + " × " + state.snapshot.hypotheses + "; up to " + state.snapshot.papers + " papers";
         document.getElementById("highlander-run-id").textContent = state.runId;
         document.getElementById("packet-snapshot").textContent = state.packetSnapshot;
-        document.getElementById("chat-scope").textContent = "Read-only evidence scope · " + state.runId + " · one Highlander job only";
+        document.getElementById("chat-scope").textContent = BOOT.mode === "http"
+          ? "Read-only evidence scope · " + state.runId + " · backend snapshot only"
+          : "Read-only evidence scope · " + state.runId + " · one Highlander job only";
         var graphNav = document.querySelector('[data-nav="graph"]');
         graphNav.disabled = false;
         graphNav.classList.remove("locked");
@@ -1387,6 +1588,7 @@
 
       function metricCell(value, prefix, suffix) {
         if (value === null || typeof value !== "number") return '<span class="badge failed">MISSING</span>';
+        if (prefix === "$" && value < 0) return "-$" + Math.abs(value) + (suffix || "");
         return (prefix || "") + value + (suffix || "");
       }
 
@@ -1432,6 +1634,16 @@
         });
       }
 
+      function simulationComparisonCell(program) {
+        if (BOOT.mode !== "http") return '<span class="badge skipped">NOT WIRED</span>';
+        var node = findNode(program.simulationNodeId);
+        if (!node) return '<span class="badge skipped">UNREPORTED</span>';
+        var view = interpretabilityView(node.metadata.stationPayload);
+        var label = view ? view.headline.result : (node.execution || "UNREPORTED");
+        var badgeClass = String(node.execution || "").toLowerCase();
+        return '<span class="badge ' + escapeHTML(badgeClass) + '">' + escapeHTML(label) + '</span><br><span class="micro muted">' + escapeHTML(node.outputOrigin || "UNREPORTED") + " · " + escapeHTML(node.resultBasis || "UNREPORTED") + "</span>";
+      }
+
       function renderComparison() {
         elements.comparisonBody.innerHTML = "";
         visiblePrograms().forEach(function (program) {
@@ -1445,7 +1657,7 @@
             "<td>" + metricCell(program.metrics.recruit, "", "/100") + "</td>" +
             "<td>" + metricCell(program.metrics.duration, "", " mo") + "</td>" +
             "<td>" + metricCell(program.metrics.plausibility, "", "/100") + "</td>" +
-            '<td><span class="badge skipped">NOT WIRED</span></td>' +
+            "<td>" + simulationComparisonCell(program) + "</td>" +
             "<td><strong>" + escapeHTML(status) + "</strong></td>";
           row.querySelector(".table-program").addEventListener("click", function () { selectProgram(program.id); });
           elements.comparisonBody.appendChild(row);
@@ -1498,12 +1710,22 @@
             ? "At least one complete record is no worse on all three baseline axes and stronger on at least one."
             : "A required objective is missing, so dominance is not inferred.";
         var tradeoffs = state.runData.programs.filter(function (candidate) { return candidate.id !== program.id && programStatus(candidate) === "non-dominated"; }).slice(0, 2).map(function (candidate) { return candidate.short; }).join("; ");
+        var simulationNode = findNode(program.simulationNodeId);
+        var simulationPacket = BOOT.mode === "http" && simulationNode
+          ? (simulationNode.execution || "UNREPORTED") + " · " + (simulationNode.outputOrigin || "UNREPORTED") + " · " + (simulationNode.resultBasis || "UNREPORTED")
+          : "SKIPPED · MODULE_NOT_WIRED or NOT_AMENABLE · NOT WIRED";
+        var evidenceAndGaps = BOOT.mode === "http"
+          ? "Native station outputs and their shared interpretability objects remain inspectable. Module execution, output origin, basis, and qualifiers stay separate."
+          : "Illustrative evidence and branch-linked proxy outputs; atomistic records are not wired and live citations are absent.";
+        var failureHistory = BOOT.mode === "http"
+          ? "Inspect each graph node for module execution and any fallback reason; a schema-valid fallback does not erase the failed live attempt."
+          : (program.roiFailed || program.recruitFailed ? "one or more mock downstream records failed; sibling branches continued." : "no branch failure beyond the terminal simulation gap.");
         elements.programDetail.innerHTML =
           '<div class="detail-callout"><strong>' + escapeHTML(program.short) + " · " + escapeHTML(status) + '</strong><p>' + escapeHTML(program.publicWhy) + "</p></div>" +
           '<div class="objective-vector"><div class="objective"><span>P50 rNPV</span><strong>' + metricCell(program.metrics.rnpv, "$", "M") + '</strong></div><div class="objective"><span>Recruitability</span><strong>' + metricCell(program.metrics.recruit, "", "/100") + '</strong></div><div class="objective"><span>Plausibility</span><strong>' + metricCell(program.metrics.plausibility, "", "/100") + "</strong></div></div>" +
           '<div class="detail-sections"><details open><summary>Why this Pareto status?</summary><p>' + escapeHTML(whyStatus) + "</p><p><strong>Selected viewing profile:</strong> " + escapeHTML(SCENARIOS[state.scenario].name) + " changes presentation order only. Baseline unweighted status remains <strong>" + escapeHTML(status) + "</strong>.</p><p><strong>Closest tradeoffs:</strong> " + escapeHTML(tradeoffs || "none with complete common axes") + ".</p></details>" +
-          "<details><summary>Packet, uncertainty & qualifiers</summary><ul><li>Source branch: " + escapeHTML(program.short) + "</li><li>Packet revision/hash: " + escapeHTML(program.revision + " · " + program.hash) + "</li><li>Uncertainty: " + escapeHTML(program.uncertainty) + "</li><li>Simulation: SKIPPED · MODULE_NOT_WIRED or NOT_AMENABLE · NOT WIRED</li><li>Economics basis: synthetic modeled · NOT_DECISION_GRADE</li></ul></details>" +
-          "<details><summary>Evidence, counterevidence & gaps</summary><p><strong>Support:</strong> illustrative evidence and branch-linked proxy outputs.</p><p><strong>Counterevidence:</strong> retained contradictory findings and modeled downside.</p><p><strong>Gaps:</strong> atomistic records not wired; live citations absent; module interop unverified.</p><p><strong>Failure history:</strong> " + escapeHTML(program.roiFailed || program.recruitFailed ? "one or more mock downstream records failed; sibling branches continued." : "no branch failure beyond the terminal simulation gap.") + "</p></details>" +
+          "<details><summary>Packet, uncertainty & qualifiers</summary><ul><li>Source branch: " + escapeHTML(program.short) + "</li><li>Packet revision/hash: " + escapeHTML(program.revision + " · " + program.hash) + "</li><li>Uncertainty: " + escapeHTML(program.uncertainty) + "</li><li>Simulation: " + escapeHTML(simulationPacket) + "</li><li>Comparison: HIGHLANDER CLIENT-SIDE · SERVER CONSUMER NOT WIRED</li></ul></details>" +
+          "<details><summary>Evidence, counterevidence & gaps</summary><p>" + escapeHTML(evidenceAndGaps) + "</p><p><strong>Failure history:</strong> " + escapeHTML(failureHistory) + "</p></details>" +
           "<details><summary>What would change the conclusion?</summary><p>A grounded contradictory finding, validated atomistic evidence, decision-grade economic inputs, a materially different enrollment precedent, or a confirmed hard constraint could create a new decision-set version. Viewing weights alone cannot.</p></details></div>";
         document.getElementById("open-source-node").dataset.nodeId = program.hypothesisNodeId;
       }
@@ -1612,7 +1834,7 @@
         if (!program) return;
         state.pendingAction = action;
         elements.actionTitle.textContent = action;
-        elements.actionDescription.textContent = action + " for " + program.short + ". This creates a mock audit event only and does not change source scientific records.";
+        elements.actionDescription.textContent = action + " for " + program.short + ". This creates a " + (BOOT.mode === "http" ? "client-local" : "mock") + " audit event only and does not change source scientific records.";
         elements.actionRationale.value = "";
         elements.actionError.textContent = "";
         elements.actionDialog.showModal();
@@ -1635,7 +1857,7 @@
           program: program.short,
           rationale: rationale,
           timestamp: new Date().toLocaleTimeString(),
-          actor: "UNVERIFIED MOCK ACTOR",
+          actor: BOOT.mode === "http" ? "UNVERIFIED LOCAL ACTOR" : "UNVERIFIED MOCK ACTOR",
           before: before,
           after: after
         });
@@ -1661,7 +1883,9 @@
           var nav = document.querySelector('[data-nav="highlander"]');
           nav.disabled = false;
           nav.classList.remove("locked");
-          showToast("One idempotent mock Highlander job created from " + state.packetSnapshot + ".");
+          showToast(BOOT.mode === "http"
+            ? "Client-side advisory comparison opened from " + state.packetSnapshot + "; server Highlander consumer remains NOT WIRED."
+            : "One idempotent mock Highlander job created from " + state.packetSnapshot + ".");
         }
         switchScreen("highlander");
       }
@@ -1799,13 +2023,40 @@
         indicator.textContent = BOOT.mode === "http" ? "backend: http · " + BOOT.base : "backend: mock (in-page demo)";
         if (BOOT.mode !== "http") return;
 
-        // Real-backend mode: repurpose the dev controls and let the backend
-        // declare its own truth labels via GET /api/meta.
+        // Local judging mode: replace mock-only copy immediately, then let the
+        // backend replace the truth strip with its authoritative /api/meta labels.
+        var strip = document.querySelector("[data-truth-strip]");
+        strip.innerHTML = '<span class="truth-chip">PROPOSED TARGET</span><span class="truth-chip">LOCAL HTTP BACKEND</span><span class="truth-chip unwired">HIGHLANDER CLIENT-SIDE · SERVER CONSUMER NOT WIRED</span>';
+        var setupModeChip = document.getElementById("setup-mode-chip");
+        setupModeChip.textContent = "Local orchestrated run";
+        setupModeChip.classList.remove("mock");
+        document.getElementById("run-mode-description").textContent = "Run creates an immutable setup snapshot, executes the orchestrated five-stage judging flow, and polls the same local process for updates.";
+        elements.runButton.textContent = "Run local exploration →";
+        document.querySelector('.rail-band[data-stage="simulation"] h2').textContent = "Target tractability";
+        document.getElementById("metric-simulation").innerHTML = '<option value="support">Tractability dossier · no scalar</option>';
+        document.getElementById("simulation-axis-source").innerHTML = "native packet<br>no scalar imputed";
+        document.getElementById("gap-confirm-copy").textContent = "I acknowledge terminal packet gaps, cached outputs, and labeled fallbacks. Continue to the advisory client-side comparison.";
         document.getElementById("restart-demo").textContent = "Refresh snapshot now";
         elements.freshnessButton.style.display = "none"; // freshness is real in http mode
+        document.getElementById("highlander-mode-description").textContent = "Client-side Pareto comparison";
+        document.getElementById("highlander-mode-chip").textContent = "CLIENT-SIDE COMPARISON";
+        document.getElementById("highlander-mode-chip").classList.remove("mock");
+        document.getElementById("highlander-server-chip").textContent = "SERVER CONSUMER NOT WIRED";
+        document.getElementById("comparison-mode-badge").textContent = "backend snapshot";
+        elements.chatLog.innerHTML = '<div class="chat-message assistant"><span class="answer-label">Scope</span> I can synthesize only the immutable backend run snapshot. I cannot browse, mutate a station record, or create new evidence.</div>';
+        document.querySelector('label[for="chat-input"]').textContent = "Ask about this run";
+        document.getElementById("record-action-button").textContent = "Record local event";
+        document.getElementById("module-dialog-summary").textContent = "This judging UI reads the local orchestrator snapshot. Each node reports module execution, output origin, result basis, runtime maturity, and qualifiers separately.";
+        document.querySelector("#module-dialog .module-table thead th:last-child").textContent = "Local judging truth";
+        document.querySelector("#module-dialog .module-table tbody").innerHTML =
+          "<tr><td>Evidence mapping</td><td>research-evidence-mapper</td><td>Rendered from the orchestrator packet; inspect LIVE/CACHED/FALLBACK origin on the node.</td></tr>" +
+          "<tr><td>Hypothesis generation</td><td>Hypothesis_Generator</td><td>Rendered from the orchestrator packet with the native station payload preserved.</td></tr>" +
+          "<tr><td>ROI / impact</td><td>rnpv-roi-calculator</td><td>Rendered with decision-grade qualifiers kept visible.</td></tr>" +
+          "<tr><td>Recruitability</td><td>clinical_simulation</td><td>A failed live attempt and schema-valid DEMO_FALLBACK remain separate truths.</td></tr>" +
+          "<tr><td>Tractability</td><td>simulation</td><td>Validated cached output is inspectable; no scalar atomistic score is imputed.</td></tr>" +
+          "<tr><td>Highlander</td><td>hypothesis-highlander</td><td>CLIENT-SIDE COMPARISON · SERVER CONSUMER NOT WIRED.</td></tr>";
         BOOT.http.fetchMeta().then(function (meta) {
           if (!meta || !Array.isArray(meta.truth_labels) || !meta.truth_labels.length) return;
-          var strip = document.querySelector("[data-truth-strip]");
           strip.innerHTML = "";
           meta.truth_labels.forEach(function (label) {
             var chip = document.createElement("span");
