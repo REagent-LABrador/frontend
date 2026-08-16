@@ -144,6 +144,9 @@ for (const required of [
 
 assert.doesNotMatch(html, /Human review actions|Hard constraints are separate\./);
 assert.doesNotMatch(app, /openActionDialog|recordAction|renderAuditLog/);
+assert.doesNotMatch(html, /frontier-count|frontier-stat|frontier-total|gap-total/);
+assert.doesNotMatch(styles, /\.frontier-count|\.frontier-stat/);
+assert.doesNotMatch(app, /frontier-total|gap-total/);
 assert.match(html, /data-pareto-frontier="nominal-projection"/);
 assert.match(html, /data-pareto-frontier-line="nominal-projection"/);
 assert.match(app, /var nominalFrontier = plottedPrograms\.filter/);
@@ -154,4 +157,4 @@ console.log("  Stage truth: module execution remains separate from fallback orig
 console.log("  Payloads: biomarker singular and program stage maps are consumed.");
 console.log("  Interpretability: readable projection retains native JSON verbatim.");
 console.log("  Backend base: integrated serving defaults to same origin.");
-console.log("  Highlander: review actions removed; nominal Pareto frontier rendered.");
+console.log("  Highlander: summary tiles and review actions removed; nominal Pareto frontier rendered.");

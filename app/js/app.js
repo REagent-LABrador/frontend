@@ -1798,10 +1798,6 @@
         renderComparison();
         renderParetoPlot();
         renderProgramDetail();
-        var frontier = state.runData.programs.filter(function (program) { return programStatus(program) === "non-dominated"; }).length;
-        var gaps = state.runData.programs.length;
-        document.getElementById("frontier-total").textContent = String(frontier);
-        document.getElementById("gap-total").textContent = String(gaps);
       }
 
       function appendChatMessage(role, content, options) {
