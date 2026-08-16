@@ -1,6 +1,13 @@
 import fs from "node:fs";
 import vm from "node:vm";
 
+import {
+  interpretabilityView,
+  normalizeStageTruth,
+  resolveBackendBase,
+  stationPayloadFor,
+} from "../../app/js/snapshot-contract.js";
+
 export class FakeElement {
   constructor() {
     this.attributes = new Map();
@@ -72,7 +79,7 @@ export function loadFunctionalApp({ search = "?backend=http" } = {}) {
   };
   const window = {
     clearTimeout() {},
-    location: { search },
+    location: { search, origin: "http://127.0.0.1:8787" },
     requestAnimationFrame(callback) {
       callback();
     },
@@ -89,13 +96,18 @@ export function loadFunctionalApp({ search = "?backend=http" } = {}) {
       return {};
     },
     document,
+    interpretabilityView,
+    normalizeStageTruth,
+    resolveBackendBase,
+    stationPayloadFor,
     setTimeout,
     window,
   };
   context.globalThis = context;
 
   let source = fs.readFileSync(new URL("../../app/js/app.js", import.meta.url), "utf8");
-  source = source.replace(/^\s*import[^\n]+\n/, "");
+  source = source.replace(/^\s*import\s+\{[\s\S]*?\}\s+from\s+["']\.\/snapshot-contract\.js["'];\s*/m, "");
+  source = source.replace(/^\s*import[^\n]+\n/m, "");
   const hookInjection = `
     globalThis.__LABRADOR_TEST_HOOKS__ = {
       state,
@@ -103,8 +115,10 @@ export function loadFunctionalApp({ search = "?backend=http" } = {}) {
       applyStationDerivations,
       buildScaffold,
       bindStage,
+      centerGraphOnActiveLineage,
       findNode,
       ingestSnapshot,
+      metricCell,
       renderInspector,
       translateWire,
       validateSetup,

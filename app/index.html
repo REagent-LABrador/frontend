@@ -55,7 +55,7 @@
               <h2>Run setup</h2>
               <p>Six inputs · provisional product contract</p>
             </div>
-            <span class="truth-chip mock">Mock run</span>
+            <span id="setup-mode-chip" class="truth-chip mock">Mock run</span>
           </header>
 
           <form id="setup-form" class="setup-form" novalidate>
@@ -150,7 +150,7 @@
             <div id="snapshot-note" class="snapshot-note" role="status"></div>
 
             <div class="setup-actions">
-              <p>Run creates an immutable setup snapshot, then plays an accelerated deterministic stage demo. Target product refresh fallback: 5 seconds.</p>
+              <p id="run-mode-description">Run creates an immutable setup snapshot, then plays an accelerated deterministic stage demo. Target product refresh fallback: 5 seconds.</p>
               <button id="run-button" class="run-button" type="submit">Run illustrative exploration →</button>
             </div>
           </form>
@@ -229,7 +229,7 @@
               <select id="metric-simulation" class="metric-select" data-metric-stage="simulation">
                 <option value="support">Atomistic support</option><option value="occupancy">Pose occupancy</option><option value="convergence">Convergence</option>
               </select>
-              <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">missing shelf<br>not wired</span></div>
+              <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span id="simulation-axis-source" class="axis-source">missing shelf<br>not wired</span></div>
             </div>
           </aside>
 
@@ -242,7 +242,7 @@
           <div class="readiness-title"><strong>Highlander readiness</strong><span id="readiness-state">BLOCKED · stages nonterminal</span></div>
           <div id="packet-counts" class="packet-counts"><span class="packet-count">0 complete</span><span class="packet-count">0 partial</span><span class="packet-count">0 blocked</span><span class="packet-count">5 nonterminal stages</span></div>
         </div>
-        <label id="gap-confirm" class="gap-confirm"><input id="gap-confirm-input" type="checkbox"> I acknowledge terminal packet gaps and proxy / not-wired inputs. Continue for product review only.</label>
+        <label id="gap-confirm" class="gap-confirm"><input id="gap-confirm-input" type="checkbox"> <span id="gap-confirm-copy">I acknowledge terminal packet gaps and proxy / not-wired inputs. Continue for product review only.</span></label>
         <button id="launch-highlander" class="button primary launch-button" type="button" disabled>Launch Highlander · blocked</button>
       </footer>
 
@@ -269,13 +269,13 @@
         <div>
           <p class="eyebrow">Screen 03 · hypothesis highlander</p>
           <h1 id="highlander-title">Tradeoffs remain visible.</h1>
-          <p><span id="highlander-run-id" class="mono">RUN—</span> · Highlander mock v0.1 · packet snapshot <span id="packet-snapshot" class="mono">—</span></p>
+          <p><span id="highlander-run-id" class="mono">RUN—</span> · <span id="highlander-mode-description">Highlander mock v0.1</span> · packet snapshot <span id="packet-snapshot" class="mono">—</span></p>
         </div>
         <div class="frontier-count">
           <div class="frontier-stat"><strong id="frontier-total">0</strong><span>non-dominated</span></div>
           <div class="frontier-stat"><strong id="gap-total">0</strong><span>with gaps</span></div>
         </div>
-        <div class="truth-stack"><span class="truth-chip mock">Proxy frontier</span><span class="truth-chip unwired">Not decision grade</span></div>
+        <div class="truth-stack"><span id="highlander-mode-chip" class="truth-chip mock">Proxy frontier</span><span id="highlander-server-chip" class="truth-chip unwired">Not decision grade</span></div>
       </header>
 
       <div class="highlander-grid">
@@ -305,7 +305,7 @@
 
         <div class="region-stack middle-stack">
           <section class="card" data-region="program-comparison" data-highlander-section="comparison" aria-labelledby="comparison-title">
-            <div class="card-head"><div><h2 id="comparison-title">Raw objective comparison</h2><p>Original units, uncertainty, qualifiers, and baseline frontier membership. No global winner.</p></div><span class="badge proxy">illustrative</span></div>
+            <div class="card-head"><div><h2 id="comparison-title">Raw objective comparison</h2><p>Original units, uncertainty, qualifiers, and baseline frontier membership. No global winner.</p></div><span id="comparison-mode-badge" class="badge proxy">illustrative</span></div>
             <div class="comparison-wrap"><table class="comparison-table"><thead><tr><th>Program</th><th>P50 rNPV</th><th>Positive rNPV</th><th>Recruitability</th><th>Enroll</th><th>Plausibility</th><th>Simulation</th><th>Baseline status</th></tr></thead><tbody id="comparison-body"></tbody></table></div>
             <figure class="pareto-figure">
               <figcaption><strong>Pareto view:</strong> recruitability vs P50 rNPV. Shape/status retains incomplete records; axes do not collapse missing values to zero.</figcaption>
@@ -349,7 +349,7 @@
   <dialog id="module-dialog" aria-labelledby="module-dialog-title">
     <div class="dialog-head"><div><p class="eyebrow">Repository alignment</p><h2 id="module-dialog-title">Target adapters vs current reality</h2></div><button class="dialog-close" type="button" data-close-dialog="module-dialog" aria-label="Close module alignment">×</button></div>
     <div class="dialog-body">
-      <p class="micro">This map is documentation—not an integration claim. The standalone mockup makes no module calls.</p>
+      <p id="module-dialog-summary" class="micro">This map is documentation—not an integration claim. The standalone mockup makes no module calls.</p>
       <table class="module-table"><thead><tr><th>Target stage</th><th>Repository module</th><th>Current mockup truth</th></tr></thead><tbody>
         <tr><td>Evidence mapping</td><td>research-evidence-mapper</td><td>Target adapter; standalone deployment exists, flow adapter unverified.</td></tr>
         <tr><td>Hypothesis generation</td><td>planned hypothesis node</td><td>NOT WIRED; source node has no pushed implementation.</td></tr>
@@ -371,7 +371,7 @@
         <textarea id="action-rationale" required placeholder="Explain why this human review action is appropriate…"></textarea>
         <p id="action-error" class="field-error"></p>
       </div>
-      <div class="dialog-actions"><button class="button" type="button" data-close-dialog="action-dialog">Cancel</button><button class="button primary" type="submit">Record mock event</button></div>
+      <div class="dialog-actions"><button class="button" type="button" data-close-dialog="action-dialog">Cancel</button><button id="record-action-button" class="button primary" type="submit">Record mock event</button></div>
     </form>
   </dialog>
 

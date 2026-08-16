@@ -8,12 +8,19 @@ labels (SIMULATED / ASSUMED / NOT decision-grade) impossible to miss.
 ## Quickstart
 
 ```bash
+# Integrated judging path (run from labrador-demo-orchestrator after bootstrap)
+uv run python app.py serve             # UI + API on one process, port 8787
+open http://127.0.0.1:8787/
+
+# Split-process frontend development
 bun serve.ts 4173                      # serve app/ (loopback, port 4173)
 bun app/dev-backend.ts                 # reference backend on :8787
-open http://localhost:4173/            # functional frontend, http mode (base :8787)
+open "http://localhost:4173/?base=http://localhost:8787"
 open "http://localhost:4173/?backend=mock"  # in-page mock demo, zero network
 node verify_mockup.mjs                 # frozen-artifact contract check (reads the
                                        #   mockup file directly; it is not served)
+node verify_functional_app.mjs         # orchestrator-integration contract
+node --test tests/frontend-live-contract.test.mjs
 ```
 
 ## Layout
@@ -27,15 +34,18 @@ node verify_mockup.mjs                 # frozen-artifact contract check (reads t
 | `app/` | The functional frontend. |
 | `app/index.html`, `app/styles.css`, `app/js/app.js` | View layer plus the in-page mock backend. |
 | `app/js/backend-http.js` | REST client: run creation, 5s snapshot polling, stale/backoff handling. |
+| `app/js/snapshot-contract.js` | Pure adapters for stage truth, native payloads, interpretability, and same-origin API selection. |
 | `app/API-CONTRACT.md` | The wire contract — the source of truth for backend integration. |
 | `app/dev-backend.ts` | Reference API server on `:8787` implementing `API-CONTRACT.md`. |
+| `verify_functional_app.mjs`, `tests/frontend-live-contract.test.mjs` | Regression checks for the orchestrator judging path. |
 
 ## Two modes
 
 The app in `app/` runs against one of two data sources:
 
-- **http (default)** — `http://localhost:4173/` against base
-  `http://localhost:8787`. Talks the REST
+- **http (default)** — uses the origin that served the frontend. The integrated
+  judging URL is `http://127.0.0.1:8787/`. A separately served frontend must
+  use `http://localhost:4173/?base=http://localhost:8787`. Talks the REST
   contract in `app/API-CONTRACT.md` via `app/js/backend-http.js`: `POST
   /api/runs` to create a run, then `GET /api/runs/:id/snapshot` polled every
   5s until all stages are terminal. On failure the client keeps the last
@@ -58,9 +68,14 @@ gets the full three-screen UI for free.
 - **Verbatim station payloads.** `station_payloads.*` render in the inspector
   as "Station output (verbatim)" with no key renamed — `simulated_*` names are
   the station's honesty contract and survive untouched.
+- **Shared interpretability.** An optional top-level `interpretability` object
+  is rendered through one module-independent reader (headline, metrics,
+  derivation steps, evidence, assumptions, uncertainty, limitations,
+  counterfactuals, and lineage), while the entire native payload remains
+  available as verbatim JSON.
 - **Truth labels from `/api/meta`.** A backend declares its own maturity
-  labels for the header truth strip; labels only accumulate, they are never
-  dropped downstream. If the endpoint is absent, the static mock labels stay.
+  labels for the header truth strip. HTTP mode starts with conservative local
+  labels, so static mock claims never leak into a real run if metadata is late.
 - One alarm colour is reserved for honesty flags; execution status, failure
   flags, and a payload's own basis are never collapsed into one green badge.
 

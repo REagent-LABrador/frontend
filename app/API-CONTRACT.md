@@ -1,19 +1,23 @@
 # LABrador frontend ↔ backend API contract (v0)
 
-The functional frontend is served at the site root (`http://localhost:4173/`)
-and runs in two modes:
+The functional frontend runs in two modes. The hackathon judging path serves
+the UI and API from one orchestrator process at `http://127.0.0.1:8787/`.
 
 | Mode | URL | Data source |
 |---|---|---|
-| http (default) | `http://localhost:4173/` | The REST API below against base `http://localhost:8787` (override with `?base=…`), implemented by `app/js/backend-http.js`. |
-| mock | `http://localhost:4173/?backend=mock` | In-page deterministic demo. Zero network. |
+| http (default) | `/` | The REST API below on the same origin that served the frontend. Split-process development can override it with `?base=…`. |
+| mock | `/?backend=mock` | In-page deterministic demo. Zero network. |
 
 Everything the graph, inspector, Highlander screen, and chat render in http mode
 comes from these endpoints. Wire format is **snake_case** (REagent-LABrador org
 convention). A backend that implements `POST /api/runs` and
 `GET /api/runs/:id/snapshot` gets the full three-screen UI for free.
 
-## CORS
+When the frontend is served separately on `:4173`, open
+`http://localhost:4173/?base=http://localhost:8787`; an unqualified `:4173/`
+now correctly targets `:4173` itself.
+
+## CORS (split-process development only)
 
 The deployment story is cross-origin: the frontend on `:4173` calls the
 backend on `:8787`. Backends **MUST** send `Access-Control-Allow-Origin`
@@ -37,9 +41,10 @@ Lets the backend declare its own honesty labels for the header truth strip.
   ]
 }
 ```
-If absent (404), the frontend keeps the static mock labels. When `/api/meta`
-responds, its labels **REPLACE** the in-page mock labels — they describe the
-active backend, so stale mock labels must not linger. (The
+If absent (404), HTTP mode keeps conservative local-backend labels and never
+shows the static mock labels. When `/api/meta` responds, its labels
+**REPLACE** those temporary labels — they describe the active backend, so
+stale labels must not linger. (The
 qualifiers-accumulate rule governs data lineage fields elsewhere in the
 contract, not this strip.) **Never claim more maturity than is live-verified.**
 
@@ -77,7 +82,20 @@ shows STALE / REFRESH_ERROR; it never fabricates a snapshot.
   "updated_at": "2026-08-16T00:55:00Z",
   "last_event_id": 41,
   "stages": [
-    { "stage_id": "biomarker",      "execution_status": "COMPLETE",               "note": "2 complete · 1 shortfall", "requested": 3, "returned": 2 },
+    {
+      "stage_id": "biomarker",
+      "execution_status": "COMPLETE_WITH_WARNINGS",
+      "module_execution_status": "SKIPPED",
+      "output_origin": "CACHED",
+      "result_basis": ["OBSERVED", "INFERRED"],
+      "runtime_maturity": "UNVERIFIED",
+      "reason_code": "MODULE_CONFIGURED_CACHED",
+      "qualifiers": ["CACHED_EVIDENCE_INPUT"],
+      "warnings": ["Pinned evidence artifact; live mapper not invoked."],
+      "note": "2 complete · 1 shortfall",
+      "requested": 3,
+      "returned": 2
+    },
     { "stage_id": "hypothesis",     "execution_status": "COMPLETE_WITH_WARNINGS", "note": "5 complete · 4 capacity unused", "requested": 9, "returned": 5 },
     { "stage_id": "roi",            "execution_status": "RUNNING",                "note": "3 complete · 2 running", "requested": 5, "returned": 3 },
     { "stage_id": "recruitability", "execution_status": "QUEUED",                 "note": "queued", "requested": 5, "returned": 0 },
@@ -89,7 +107,27 @@ shows STALE / REFRESH_ERROR; it never fabricates a snapshot.
       "label": "IL6R",
       "summary": "Inflammatory signaling anchor",
       "metrics": { "exploration": 1, "evidence": 86, "pursuit": 3 },
-      "uncertainty": "±8 points, search scope: 40-paper cap"
+      "uncertainty": "±8 points, search scope: 40-paper cap",
+      "station_payload": {
+        "interpretability": {
+          "schema_version": "1.0.0",
+          "headline": {
+            "title": "Evidence coverage",
+            "result": "QUALIFIED_SUPPORT",
+            "plain_language": "Evidence supports the mechanism with material coverage gaps.",
+            "status": "QUALIFIED",
+            "basis": ["OBSERVED", "INFERRED"]
+          },
+          "metrics": [], "steps": [], "evidence": [], "assumptions": [],
+          "uncertainty": {
+            "method": "coverage assessment", "intervals": [],
+            "seed": null, "draws": null,
+            "limitations": ["Search coverage was truncated."]
+          },
+          "limitations": [], "counterfactuals": [], "lineage": [],
+          "extensions": {}
+        }
+      }
     }
   ],
   "programs": [
@@ -129,6 +167,12 @@ shows STALE / REFRESH_ERROR; it never fabricates a snapshot.
 - **`execution_status` is a closed enum:** `QUEUED | RUNNING | COMPLETE |
   COMPLETE_WITH_WARNINGS | FAILED`. Terminal = `COMPLETE`,
   `COMPLETE_WITH_WARNINGS`, `FAILED`. No other values.
+- **Presentation and execution are separate when fallback/cached output exists.**
+  `execution_status` is the terminal stage result used by progress. Optional
+  `module_execution_status` preserves the actual invocation (`SKIPPED` or
+  `FAILED` can still yield a validated cached/fallback result). Optional
+  `output_origin`, `result_basis`, `runtime_maturity`, `reason_code`,
+  `qualifiers`, and `warnings` are rendered verbatim as run truth.
 - **Ceilings, not quotas.** `requested` vs `returned` with a human `note`; never
   pad weak candidates to fill capacity. Unreturned lanes stay scaffolds.
 - **`requested` for downstream stages** (roi, recruitability, simulation)
@@ -153,6 +197,12 @@ shows STALE / REFRESH_ERROR; it never fabricates a snapshot.
   `metrics.screens`, and `uncertainty` from the payload — the payload wins
   over the `metrics` block. Backends SHOULD still send already-derived
   metrics, but the payload is authoritative.
+- **Native artifacts are retained.** Biomarker records may use singular
+  `station_payload`; program stages use `station_payloads.<stage>`. A payload
+  may include the shared optional `interpretability` object. The UI projects
+  that object into headline, metrics, steps, evidence, assumptions,
+  uncertainty, limitations, counterfactuals, and lineage while retaining the
+  complete native JSON.
 
 ### First real station: `clinical_simulation` (recruitability)
 
@@ -165,7 +215,7 @@ it:
 | `metrics.recruit` | `score * 100` (score is 0–1 recruitability; **not** probability of approval) |
 | `metrics.duration` | `simulated_months_to_enroll` (months) |
 | `metrics.screens` | `screens_per_enrollee` |
-| `uncertainty` | from `simulated_months_range`, e.g. `"simulated months IQR: 8–35"` |
+| `uncertainty` | from `simulated_months_range`, e.g. `"simulated months range: 8–35"`; the UI does not invent an IQR/percentile meaning |
 | `public_why` | the output's `why` paragraph |
 | `recruit_failed` | `true` only if the station errored (not for a bad score — score 0 is a result) |
 | `station_payloads.recruitability` | **the entire result object, verbatim** |
