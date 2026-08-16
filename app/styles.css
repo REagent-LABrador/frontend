@@ -940,7 +940,9 @@
       display: grid;
       grid-template-columns: 302px minmax(520px, 1.35fr) minmax(380px, .9fr);
       gap: 12px;
-      height: calc(100vh - 76px - 126px);
+      /* 126px is the .highlander-head band. Screen 3 has no footer, so nothing else
+         is reserved below the grid. */
+      height: calc(100vh - 126px);
       min-height: 520px;
       padding: 12px;
       overflow: auto;
