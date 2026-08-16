@@ -543,11 +543,13 @@
     .run-identity h1 { margin: 0 0 5px; font-size: 25px; line-height: 1.1; letter-spacing: -.035em; }
     .run-identity p { margin: 0; color: var(--muted); font-size: 10px; }
 
-    .progress-strip { display: grid; grid-template-columns: repeat(5, minmax(88px, 1fr)); gap: 5px; }
+    .progress-strip { display: grid; grid-template-columns: repeat(5, minmax(88px, 1fr)); gap: 5px; min-height: 0; }
 
     .progress-step {
       min-width: 0;
+      min-height: 0;
       padding: 9px 8px;
+      overflow: hidden;
       background: #f0ede3;
       border: 1px solid #d7d0bf;
       border-radius: 9px;
@@ -555,7 +557,17 @@
 
     .progress-step .stage-num { color: #7a827c; font-size: 9px; font-weight: 900; }
     .progress-step strong { display: block; overflow: hidden; text-overflow: ellipsis; font-size: 10px; white-space: nowrap; }
-    .progress-step .stage-state { color: #646c66; font-size: 9px; font-weight: 800; }
+    /* Stage notes are full sentences in a ~134px chip. Clamp them so the strip cannot outgrow
+       the fixed --graph-header band; the untruncated note stays available as the title tooltip. */
+    .progress-step .stage-state {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      overflow: hidden;
+      color: #646c66;
+      font-size: 9px;
+      font-weight: 800;
+    }
     .progress-step[data-state="running"] { background: var(--blue-soft); border-color: #7cb0bb; }
     .progress-step[data-state="complete"] { background: var(--green-soft); border-color: #88caa1; }
     .progress-step[data-state="warning"] { background: var(--amber-soft); border-color: #d8aa58; }
@@ -567,7 +579,7 @@
 
     .graph-scroller {
       position: relative;
-      height: calc(100vh - 76px - var(--graph-header) - var(--graph-footer));
+      height: calc(100vh - var(--graph-header) - var(--graph-footer));
       min-height: 430px;
       overflow: auto;
       overscroll-behavior: contain;

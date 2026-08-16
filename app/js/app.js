@@ -1167,6 +1167,9 @@
           item.className = "progress-step";
           item.dataset.stage = stage.id;
           item.dataset.state = state.stageStates[index];
+          // The note is clamped to three lines in the fixed-height header; keep the full text
+          // reachable rather than truncating it away.
+          item.title = stage.label + " · " + state.stageNotes[index];
           item.innerHTML = '<span class="stage-num">0' + (index + 1) + '</span><strong>' + escapeHTML(stage.label) + '</strong><span class="stage-state">' + escapeHTML(state.stageNotes[index]) + "</span>";
           elements.progress.appendChild(item);
         });
