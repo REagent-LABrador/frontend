@@ -268,8 +268,18 @@ answer. If the endpoint is missing, the client abstains on the backend's behalf
 ## Not in v0 (documented gaps)
 
 - **Highlander runs client-side** off the snapshot's programs (same Pareto
-  logic in mock and http modes). A server-side Highlander job endpoint is a
-  future addition.
+  logic in mock and http modes). Its baseline vector is exactly
+  `metrics.rnpv` (ROI), `metrics.recruit` (recruitability), and the simulation
+  / tractability value (`metrics.tractability_fit`, or native `metrics.support`
+  when that scalar is actually supplied). Plausibility is displayed but is not
+  a Pareto axis. Missing any of the three required values makes the plan
+  incomparable; the client never substitutes zero. Every returned plan is
+  mapped to a stable numbered point, and the projected 3D view fills the
+  remaining comparison-panel height beneath the objective table. The RA demo's
+  Z value is explicitly labeled representative branch-context fit; the shared
+  native cached dossier remains attached and is not presented as a
+  candidate-specific simulation result. A server-side Highlander job endpoint
+  is a future addition.
 - **Review actions** (shortlist/constraint/exclude) are recorded in a
   client-side audit log only; `POST /api/runs/:id/actions` is future work.
 - **No auth/identity.** Do not present actor fields as verified.

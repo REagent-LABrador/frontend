@@ -1591,16 +1591,34 @@
         }, 320);
       }
 
+      function simulationParetoValue(program) {
+        var metrics = program && program.metrics ? program.metrics : {};
+        if (Number.isFinite(metrics.tractability_fit)) return metrics.tractability_fit;
+        if (Number.isFinite(metrics.support)) return metrics.support <= 1 ? metrics.support * 100 : metrics.support;
+        return null;
+      }
+
+      function paretoVector(program) {
+        return {
+          roi: program && program.metrics ? program.metrics.rnpv : null,
+          recruitability: program && program.metrics ? program.metrics.recruit : null,
+          simulation: simulationParetoValue(program)
+        };
+      }
+
       function dominates(a, b) {
-        var keys = ["rnpv", "recruit", "plausibility"];
-        if (keys.some(function (key) { return a.metrics[key] === null || b.metrics[key] === null; })) return false;
-        var noWorse = keys.every(function (key) { return a.metrics[key] >= b.metrics[key]; });
-        var better = keys.some(function (key) { return a.metrics[key] > b.metrics[key]; });
+        var aVector = paretoVector(a);
+        var bVector = paretoVector(b);
+        var keys = ["roi", "recruitability", "simulation"];
+        if (keys.some(function (key) { return !Number.isFinite(aVector[key]) || !Number.isFinite(bVector[key]); })) return false;
+        var noWorse = keys.every(function (key) { return aVector[key] >= bVector[key]; });
+        var better = keys.some(function (key) { return aVector[key] > bVector[key]; });
         return noWorse && better;
       }
 
       function programStatus(program) {
-        if (program.metrics.rnpv === null || program.metrics.recruit === null || program.metrics.plausibility === null) return "incomparable";
+        var vector = paretoVector(program);
+        if (![vector.roi, vector.recruitability, vector.simulation].every(Number.isFinite)) return "incomparable";
         var dominated = state.runData.programs.some(function (other) {
           return other.id !== program.id && dominates(other, program);
         });
@@ -1702,44 +1720,87 @@
 
       function renderParetoPlot() {
         var svg = elements.paretoPlot;
-        svg.innerHTML = '<line x1="46" y1="126" x2="616" y2="126" stroke="#7f857e"/><line x1="46" y1="12" x2="46" y2="126" stroke="#7f857e"/><text x="330" y="149" text-anchor="middle" font-size="9" fill="#56615a">P50 rNPV · $M modeled →</text><text x="12" y="75" transform="rotate(-90 12 75)" text-anchor="middle" font-size="9" fill="#56615a">Recruitability /100 →</text><text x="48" y="10" font-size="7" fill="#7a817b">high</text><text x="48" y="138" font-size="7" fill="#7a817b">missing shelf</text><polyline id="nominal-pareto-frontier" class="pareto-frontier-line" data-pareto-frontier-line="nominal-projection" points="" role="img" aria-label="Nominal Pareto frontier projection"></polyline>';
-        var plottedPrograms = state.runData.programs.map(function (program) {
+        svg.innerHTML = '<g class="pareto-depth-grid" aria-hidden="true"><line class="back-edge" x1="145" y1="135" x2="645" y2="135"/><line class="back-edge" x1="145" y1="135" x2="145" y2="15"/><line class="back-edge" x1="70" y1="60" x2="570" y2="60"/><line class="back-edge" x1="70" y1="60" x2="145" y2="15"/><line class="back-edge" x1="570" y1="180" x2="645" y2="135"/><line class="back-edge" x1="570" y1="180" x2="570" y2="60"/><line class="back-edge" x1="570" y1="60" x2="645" y2="15"/><line class="back-edge" x1="645" y1="135" x2="645" y2="15"/><line class="back-edge" x1="145" y1="15" x2="645" y2="15"/></g><line class="pareto-axis" x1="70" y1="180" x2="570" y2="180"/><line class="pareto-axis" x1="70" y1="180" x2="70" y2="60"/><line class="pareto-axis" x1="70" y1="180" x2="145" y2="135"/><text class="pareto-axis-label" x="320" y="207" text-anchor="middle">P50 rNPV · $M modeled →</text><text class="pareto-axis-label" x="18" y="120" transform="rotate(-90 18 120)" text-anchor="middle">Recruitability /100 →</text><text class="pareto-axis-label" x="89" y="151" transform="rotate(-31 89 151)">Simulation / tractability /100 →</text><line class="pareto-shelf" x1="70" y1="230" x2="645" y2="230"/><text x="70" y="244" font-size="7" fill="#7a817b">missing objective shelf · not plotted as zero</text><polyline id="nominal-pareto-frontier" class="pareto-frontier-line" data-pareto-frontier-line="nominal-projection" points="" role="img" aria-label="Nominal Pareto frontier projection"></polyline><text id="pareto-selected-plan" class="pareto-selection-label" x="350" y="28"></text>';
+        var planCount = state.runData.programs.length;
+        var plottedPrograms = state.runData.programs.map(function (program, index) {
+          var vector = paretoVector(program);
+          var complete = [vector.roi, vector.recruitability, vector.simulation].every(Number.isFinite);
+          var roiPosition = complete ? Math.max(0, Math.min(250, vector.roi)) / 250 : null;
+          var recruitabilityPosition = complete ? Math.max(0, Math.min(100, vector.recruitability)) / 100 : null;
+          var simulationPosition = complete ? Math.max(0, Math.min(100, vector.simulation)) / 100 : null;
           return {
             program: program,
             status: programStatus(program),
-            x: program.metrics.rnpv === null ? 58 : 46 + Math.max(0, Math.min(300, program.metrics.rnpv)) / 300 * 570,
-            y: program.metrics.recruit === null ? 133 : 126 - program.metrics.recruit / 100 * 108
+            vector: vector,
+            planNumber: index + 1,
+            complete: complete,
+            baseX: complete ? 70 + roiPosition * 500 + simulationPosition * 75 : 85 + (planCount <= 1 ? 0 : index / (planCount - 1) * 545),
+            baseY: complete ? 180 - recruitabilityPosition * 120 - simulationPosition * 45 : 230,
+            x: null,
+            y: null,
+            clustered: false
           };
         });
+        plottedPrograms.forEach(function (point) {
+          point.x = point.baseX;
+          point.y = point.baseY;
+        });
+        var vectorClusters = new Map();
+        plottedPrograms.filter(function (point) { return point.complete; }).forEach(function (point) {
+          var key = [point.vector.roi, point.vector.recruitability, point.vector.simulation].join("|");
+          if (!vectorClusters.has(key)) vectorClusters.set(key, []);
+          vectorClusters.get(key).push(point);
+        });
+        vectorClusters.forEach(function (cluster) {
+          if (cluster.length < 2) return;
+          var radius = Math.min(16, 8 + cluster.length * 2);
+          cluster.forEach(function (point, clusterIndex) {
+            var angle = -Math.PI / 2 + clusterIndex * Math.PI * 2 / cluster.length;
+            point.x = point.baseX + Math.cos(angle) * radius;
+            point.y = point.baseY + Math.sin(angle) * radius;
+            point.clustered = true;
+          });
+        });
         var nominalFrontier = plottedPrograms.filter(function (point) {
-          return point.status === "non-dominated" && Number.isFinite(point.program.metrics.rnpv) && Number.isFinite(point.program.metrics.recruit);
+          return point.status === "non-dominated" && point.complete;
         }).sort(function (a, b) {
-          return a.x - b.x || a.y - b.y || a.program.id.localeCompare(b.program.id);
+          return a.vector.roi - b.vector.roi || a.vector.recruitability - b.vector.recruitability || a.vector.simulation - b.vector.simulation || a.program.id.localeCompare(b.program.id);
         }).filter(function (point, index, points) {
-          return index === 0 || point.x !== points[index - 1].x || point.y !== points[index - 1].y;
+          return index === 0 || point.vector.roi !== points[index - 1].vector.roi || point.vector.recruitability !== points[index - 1].vector.recruitability || point.vector.simulation !== points[index - 1].vector.simulation;
         });
         var frontierLine = document.getElementById("nominal-pareto-frontier");
         if (nominalFrontier.length === 1) {
           var onlyPoint = nominalFrontier[0];
-          frontierLine.setAttribute("points", Math.max(46, onlyPoint.x - 20) + "," + onlyPoint.y + " " + Math.min(616, onlyPoint.x + 20) + "," + onlyPoint.y);
+          frontierLine.setAttribute("points", Math.max(46, onlyPoint.baseX - 20) + "," + onlyPoint.baseY + " " + Math.min(654, onlyPoint.baseX + 20) + "," + onlyPoint.baseY);
         } else if (nominalFrontier.length > 1) {
-          frontierLine.setAttribute("points", nominalFrontier.map(function (point) { return point.x + "," + point.y; }).join(" "));
+          frontierLine.setAttribute("points", nominalFrontier.map(function (point) { return point.baseX + "," + point.baseY; }).join(" "));
         } else {
           frontierLine.setAttribute("visibility", "hidden");
         }
         plottedPrograms.forEach(function (point) {
           var program = point.program;
           var status = point.status;
+          var programLabel = program.short || program.label || program.id;
+          if (point.clustered) {
+            var stem = document.createElementNS(svg.namespaceURI, "line");
+            stem.setAttribute("x1", String(point.baseX));
+            stem.setAttribute("y1", String(point.baseY));
+            stem.setAttribute("x2", String(point.x));
+            stem.setAttribute("y2", String(point.y));
+            stem.setAttribute("class", "pareto-cluster-stem");
+            svg.appendChild(stem);
+          }
           var circle = document.createElementNS(svg.namespaceURI, "circle");
           circle.setAttribute("cx", String(point.x));
           circle.setAttribute("cy", String(point.y));
-          circle.setAttribute("r", program.id === state.selectedProgramId ? "7" : "5");
+          circle.setAttribute("r", program.id === state.selectedProgramId ? "9" : "7");
           circle.setAttribute("class", "plot-point " + status + (program.id === state.selectedProgramId ? " selected" : ""));
+          circle.setAttribute("data-plan-id", program.id);
           circle.setAttribute("tabindex", "0");
           circle.setAttribute("role", "button");
-          circle.setAttribute("aria-label", program.short + "; " + status + "; select program");
+          circle.setAttribute("aria-label", "Plan " + point.planNumber + ": " + programLabel + "; ROI " + (Number.isFinite(point.vector.roi) ? "$" + point.vector.roi + "M" : "missing") + "; recruitability " + (Number.isFinite(point.vector.recruitability) ? point.vector.recruitability + "/100" : "missing") + "; simulation or tractability " + (Number.isFinite(point.vector.simulation) ? point.vector.simulation + "/100" : "missing") + "; " + status + "; select plan");
           var title = document.createElementNS(svg.namespaceURI, "title");
-          title.textContent = program.short + " · " + status;
+          title.textContent = "Plan " + point.planNumber + " · " + programLabel + " · ROI " + (Number.isFinite(point.vector.roi) ? "$" + point.vector.roi + "M" : "missing") + " · recruitability " + (Number.isFinite(point.vector.recruitability) ? point.vector.recruitability + "/100" : "missing") + " · simulation / tractability " + (Number.isFinite(point.vector.simulation) ? point.vector.simulation + "/100" : "missing") + " · " + status;
           circle.appendChild(title);
           circle.addEventListener("click", function () { selectProgram(program.id); });
           circle.addEventListener("keydown", function (event) {
@@ -1749,6 +1810,16 @@
             }
           });
           svg.appendChild(circle);
+          var planIndex = document.createElementNS(svg.namespaceURI, "text");
+          planIndex.setAttribute("x", String(point.x));
+          planIndex.setAttribute("y", String(point.y));
+          planIndex.setAttribute("class", "plot-plan-index");
+          planIndex.textContent = String(point.planNumber);
+          svg.appendChild(planIndex);
+          if (program.id === state.selectedProgramId) {
+            var selectedLabel = document.getElementById("pareto-selected-plan");
+            selectedLabel.textContent = "Selected plan " + point.planNumber + " · " + (programLabel.length > 52 ? programLabel.slice(0, 49) + "…" : programLabel);
+          }
         });
       }
 
@@ -1763,8 +1834,9 @@
           return;
         }
         var status = programStatus(program);
+        var simulationMetric = simulationParetoValue(program);
         var whyStatus = status === "non-dominated"
-          ? "No other complete record is at least as strong on P50 rNPV, recruitability, and plausibility while being strictly stronger on one."
+          ? "No other complete record is at least as strong on P50 rNPV, recruitability, and simulation / tractability while being strictly stronger on one."
           : status === "dominated"
             ? "At least one complete record is no worse on all three baseline axes and stronger on at least one."
             : "A required objective is missing, so dominance is not inferred.";
@@ -1783,7 +1855,7 @@
           : (program.roiFailed || program.recruitFailed ? "one or more mock downstream records failed; sibling branches continued." : "no branch failure beyond the terminal simulation gap.");
         elements.programDetail.innerHTML =
           '<div class="detail-callout"><strong>' + escapeHTML(program.short) + " · " + escapeHTML(status) + '</strong><p>' + escapeHTML(program.publicWhy) + "</p></div>" +
-          '<div class="objective-vector"><div class="objective"><span>P50 rNPV</span><strong>' + metricCell(program.metrics.rnpv, "$", "M") + '</strong></div><div class="objective"><span>Recruitability</span><strong>' + metricCell(program.metrics.recruit, "", "/100") + '</strong></div><div class="objective"><span>Plausibility</span><strong>' + metricCell(program.metrics.plausibility, "", "/100") + "</strong></div></div>" +
+          '<div class="objective-vector"><div class="objective"><span>P50 rNPV</span><strong>' + metricCell(program.metrics.rnpv, "$", "M") + '</strong></div><div class="objective"><span>Recruitability</span><strong>' + metricCell(program.metrics.recruit, "", "/100") + '</strong></div><div class="objective"><span>Simulation / tractability</span><strong>' + metricCell(simulationMetric, "", "/100") + "</strong></div></div>" +
           '<div class="detail-sections"><details open><summary>Why this Pareto status?</summary><p>' + escapeHTML(whyStatus) + "</p><p><strong>Selected viewing profile:</strong> " + escapeHTML(SCENARIOS[state.scenario].name) + " changes presentation order only. Baseline unweighted status remains <strong>" + escapeHTML(status) + "</strong>.</p><p><strong>Closest tradeoffs:</strong> " + escapeHTML(tradeoffs || "none with complete common axes") + ".</p></details>" +
           "<details><summary>Packet, uncertainty & qualifiers</summary><ul><li>Source branch: " + escapeHTML(program.short) + "</li><li>Packet revision/hash: " + escapeHTML(program.revision + " · " + program.hash) + "</li><li>Uncertainty: " + escapeHTML(program.uncertainty) + "</li><li>Simulation: " + escapeHTML(simulationPacket) + "</li><li>Comparison: HIGHLANDER CLIENT-SIDE · SERVER CONSUMER NOT WIRED</li></ul></details>" +
           "<details><summary>Evidence, counterevidence & gaps</summary><p>" + escapeHTML(evidenceAndGaps) + "</p><p><strong>Failure history:</strong> " + escapeHTML(failureHistory) + "</p></details>" +

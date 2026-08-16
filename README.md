@@ -73,6 +73,13 @@ gets the full three-screen UI for free.
   `display_metric_basis=REPRESENTATIVE_DEMO_SCENARIO_V1`. Those values drive
   graph placement and the client-side Pareto view while native metrics and
   station artifacts remain unchanged and inspectable through run artifacts.
+- **Three-axis plan map.** Highlander maps every returned plan as a numbered,
+  selectable point using exactly P50 rNPV (ROI), recruitability, and simulation
+  / tractability. Plausibility remains visible comparison context but does not
+  affect baseline Pareto membership. A plan missing any required axis is
+  incomparable and stays on the missing-objective shelf rather than being
+  imputed as zero. The projected 3D chart fills the available comparison panel
+  beneath the objective table so the plan map remains the primary visual.
 - **Shared interpretability.** An optional top-level `interpretability` object
   is rendered through one module-independent reader (headline, metrics,
   derivation steps, evidence, assumptions, uncertainty, limitations,
