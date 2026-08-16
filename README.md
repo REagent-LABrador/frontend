@@ -34,13 +34,15 @@ node verify_mockup.mjs                 # frozen-artifact contract check (reads t
 
 The app in `app/` runs against one of two data sources:
 
-- **mock (default)** — `/app/`. A deterministic in-page demo; zero network.
-- **http** — `/app/?backend=http&base=http://localhost:8787`. Talks the REST
+- **http (default)** — `http://localhost:4173/` against base
+  `http://localhost:8787`. Talks the REST
   contract in `app/API-CONTRACT.md` via `app/js/backend-http.js`: `POST
   /api/runs` to create a run, then `GET /api/runs/:id/snapshot` polled every
   5s until all stages are terminal. On failure the client keeps the last
   confirmed data, backs off 5s → 10s → 20s → 60s, and shows STALE /
   REFRESH_ERROR — it never fabricates a snapshot.
+- **mock** — `http://localhost:4173/?backend=mock`. A deterministic in-page
+  demo; zero network.
 
 Any backend that implements `POST /api/runs` and `GET /api/runs/:id/snapshot`
 gets the full three-screen UI for free.

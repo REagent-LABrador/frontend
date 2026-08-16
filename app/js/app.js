@@ -1,10 +1,11 @@
     import { createHttpBackend } from "./backend-http.js";
 
-    // Backend selection: mock (default, in-page deterministic demo, zero network)
-    // or ?backend=http&base=http://localhost:8787 (real run API per ../API-CONTRACT.md).
+    // Backend selection: http (default — the served link is the production-shaped
+    // build; real run API per ../API-CONTRACT.md, base http://localhost:8787 or
+    // ?base=…) or ?backend=mock (in-page deterministic demo, zero network).
     var BOOT = (function () {
       var params = new URLSearchParams(window.location.search);
-      var mode = params.get("backend") === "http" ? "http" : "mock";
+      var mode = params.get("backend") === "mock" ? "mock" : "http";
       var base = params.get("base") || "http://localhost:8787";
       return { mode: mode, base: base, http: mode === "http" ? createHttpBackend(base) : null };
     }());
@@ -321,6 +322,18 @@
         high.style.zIndex = "4";
       }
 
+      // Derive a program's display metrics from an attached verbatim recruitability
+      // station payload so the node, the Highlander table, and the Pareto plot all
+      // agree with the attached record. Never applied to failed recruitment records.
+      function applyStationDerivations(program) {
+        if (!program.stationPayloads || !program.stationPayloads.recruitability || program.recruitFailed) return;
+        var payload = program.stationPayloads.recruitability;
+        if (typeof payload.score === "number") program.metrics.recruit = Math.round(payload.score * 100);
+        if (typeof payload.simulated_months_to_enroll === "number") program.metrics.duration = payload.simulated_months_to_enroll;
+        if (typeof payload.screens_per_enrollee === "number") program.metrics.screens = payload.screens_per_enrollee;
+        if (Array.isArray(payload.simulated_months_range)) program.uncertainty = "simulated months IQR: " + payload.simulated_months_range[0] + "–" + payload.simulated_months_range[1];
+      }
+
       function buildRunData(snapshot) {
         var biomarkers = [];
         var programs = [];
@@ -385,7 +398,10 @@
         }
 
         var seamProgram = programs.find(function (program) { return program.lane === 1; });
-        if (seamProgram) seamProgram.stationPayloads = { recruitability: STATION_EXAMPLE_RECRUITABILITY };
+        if (seamProgram) {
+          seamProgram.stationPayloads = { recruitability: STATION_EXAMPLE_RECRUITABILITY };
+          applyStationDerivations(seamProgram);
+        }
 
         return {
           biomarkers: biomarkers,
@@ -520,9 +536,17 @@
         });
       }
 
+      function stageTerminal(index) {
+        var stageState = state.stageStates[index];
+        return stageState === "complete" || stageState === "warning" || stageState === "failed";
+      }
+
       function retireUnusedCapacity() {
+        // A slot may only retire once the stage that would have filled it is terminal;
+        // a partial snapshot (e.g. hypothesis stage still queued) must not retire lanes.
         state.nodes.forEach(function (node) {
           if (node.stage === "indication") return;
+          if (node.stage === "biomarker" ? !stageTerminal(0) : !stageTerminal(1)) return;
           var isActual = node.stage === "biomarker"
             ? Boolean(actualBiomarker(node.metadata.slot))
             : Boolean(actualProgramForLane(node.lane));
@@ -534,6 +558,7 @@
       }
 
       function bindStage(stage) {
+        var httpMode = BOOT.mode === "http";
         state.nodes.forEach(function (node) {
           if (node.stage !== stage) return;
           var biomarker = stage === "biomarker" ? actualBiomarker(node.metadata.slot) : null;
@@ -545,8 +570,8 @@
           if (stage === "biomarker") {
             node.label = biomarker.label;
             node.execution = "COMPLETE";
-            node.resultBasis = "ILLUSTRATIVE PROXY";
-            node.runtime = "TARGET ADAPTER";
+            node.resultBasis = httpMode ? "BACKEND-REPORTED" : "ILLUSTRATIVE PROXY";
+            node.runtime = httpMode ? "BACKEND SNAPSHOT" : "TARGET ADAPTER";
             node.metrics = biomarker.metrics;
             node.uncertainty = biomarker.uncertainty;
             node.metadata.summary = biomarker.summary;
@@ -554,21 +579,21 @@
           if (stage === "hypothesis") {
             node.label = program.label;
             node.execution = "COMPLETE";
-            node.resultBasis = "ILLUSTRATIVE PROXY";
-            node.runtime = "NOT WIRED";
+            node.resultBasis = httpMode ? "BACKEND-REPORTED" : "ILLUSTRATIVE PROXY";
+            node.runtime = httpMode ? "BACKEND SNAPSHOT" : "NOT WIRED";
             node.metrics = {
               boldness: program.metrics.boldness,
               evidence: program.metrics.evidence,
               plausibility: program.metrics.plausibility
             };
-            node.uncertainty = "Proxy scores are ordinal product fixtures.";
+            node.uncertainty = httpMode ? (program.uncertainty || "not supplied") : "Proxy scores are ordinal product fixtures.";
             node.metadata.summary = "Illustrative terminal hypothesis; no generator module was called.";
           }
           if (stage === "roi") {
             node.label = "Economics · " + program.short;
             node.execution = program.roiFailed ? "FAILED" : "COMPLETE";
-            node.resultBasis = program.roiFailed ? "MISSING" : "SYNTHETIC MODELED";
-            node.runtime = "LOCAL MODULE TARGET";
+            node.resultBasis = program.roiFailed ? "MISSING" : (httpMode ? "MODELED (backend)" : "SYNTHETIC MODELED");
+            node.runtime = httpMode ? "BACKEND SNAPSHOT" : "LOCAL MODULE TARGET";
             node.metrics = {
               rnpv: program.metrics.rnpv,
               positive: program.metrics.positive,
@@ -582,15 +607,15 @@
           if (stage === "recruitability") {
             node.label = "Recruitment · " + program.short;
             node.execution = program.recruitFailed ? "FAILED" : "COMPLETE";
-            node.resultBasis = program.recruitFailed ? "MISSING" : "SIMULATED PROXY";
-            node.runtime = "LOCAL MODULE TARGET";
+            node.resultBasis = program.recruitFailed ? "MISSING" : (httpMode ? "SIMULATED (backend)" : "SIMULATED PROXY");
+            node.runtime = httpMode ? "BACKEND SNAPSHOT" : "LOCAL MODULE TARGET";
             node.metrics = {
               recruit: program.metrics.recruit,
               duration: program.metrics.duration,
               screens: program.metrics.screens,
               risk: program.metrics.risk
             };
-            node.uncertainty = program.recruitFailed ? "No numeric output returned." : "Illustrative duration range ±4 months.";
+            node.uncertainty = program.recruitFailed ? "No numeric output returned." : (httpMode ? (program.uncertainty || "not supplied") : "Illustrative duration range ±4 months.");
             node.reason = program.recruitFailed ? "MOCK_FORECAST_FAILURE · sibling branches continued" : null;
             node.metadata.summary = "Synthetic RecruitabilityResult-compatible fields.";
           }
@@ -606,16 +631,17 @@
               : "MODULE_NOT_WIRED";
             node.metadata.summary = "No atomistic capability was called by this standalone mockup.";
           }
-          // When a real station produced this record, its verbatim output rides along
-          // and overrides the mock provenance labels. Key names are never renamed.
+          // When a real station produced this record, its verbatim output rides along.
+          // The payload never overwrites execution status or a failure/skip reason;
+          // provenance labels upgrade only for records that actually resolved.
           var payload = program && program.stationPayloads ? program.stationPayloads[stage] : null;
           if (payload) {
             node.metadata.stationPayload = payload;
-            node.execution = "COMPLETE";
-            node.resultBasis = "MODELED · VERBATIM STATION OUTPUT";
-            node.runtime = "STATION ATTACHED";
-            node.reason = null;
             node.metadata.summary = "Verbatim station output attached (input id: " + (payload.input && payload.input.id ? payload.input.id : "unknown") + "). Displayed keys are never renamed.";
+            if (node.execution !== "FAILED" && node.execution !== "SKIPPED" && node.execution !== "NOT_AMENABLE") {
+              node.resultBasis = "MODELED · VERBATIM STATION OUTPUT";
+              node.runtime = "STATION ATTACHED";
+            }
           }
         });
         retireUnusedCapacity();
@@ -977,12 +1003,20 @@
 
       // ---- HTTP mode: wire-snapshot ingestion (contract: ../API-CONTRACT.md) ----
 
+      // Every metric key the UI tests with === null; wire omissions must become
+      // null (missing shelf), never undefined, or dominates()/renderParetoPlot misbehave.
+      var WIRE_METRIC_KEYS = ["boldness", "evidence", "plausibility", "rnpv", "positive", "impact", "recruit", "duration", "screens", "risk", "support", "occupancy", "convergence"];
+
       function translateWire(ws) {
         var biomarkers = (ws.biomarkers || []).map(function (item) {
           return { slot: item.slot, id: "bio-slot-" + item.slot, label: item.label, summary: item.summary || "", metrics: item.metrics || {}, uncertainty: item.uncertainty || "not supplied" };
         });
         var programs = (ws.programs || []).map(function (item, index) {
-          return {
+          var metrics = item.metrics || {};
+          WIRE_METRIC_KEYS.forEach(function (key) {
+            if (metrics[key] === undefined) metrics[key] = null;
+          });
+          var program = {
             id: item.id || "program-" + (index + 1),
             lane: item.lane,
             biomarkerSlot: item.biomarker_slot,
@@ -993,7 +1027,7 @@
             simulationNodeId: "simulation-slot-" + item.lane,
             label: item.label,
             short: item.short_label || item.label,
-            metrics: item.metrics || {},
+            metrics: metrics,
             uncertainty: item.uncertainty || "not supplied",
             publicWhy: item.public_why || "No public rationale supplied by the backend for this record.",
             roiFailed: Boolean(item.roi_failed),
@@ -1004,6 +1038,8 @@
             hash: item.hash || "unhashed",
             stationPayloads: item.station_payloads || {}
           };
+          applyStationDerivations(program);
+          return program;
         });
         var requestedLanes = state.snapshot.biomarkers * state.snapshot.hypotheses;
         return {
@@ -1036,7 +1072,9 @@
         if (state.selectedId && state.inspectorVisible) renderInspector(findNode(state.selectedId));
         var allTerminal = state.stageStates.every(function (item) { return item === "complete" || item === "warning" || item === "failed"; });
         if (allTerminal) {
-          state.highlanderReady = state.runData.programs.length > 0;
+          // A backend that explicitly says highlander_ready: false blocks launch;
+          // true or absent defers to the client's own gate (programs exist).
+          state.highlanderReady = state.runData.programs.length > 0 && ws.highlander_ready !== false;
           if (!state.selectedProgramId && state.runData.programs.length) state.selectedProgramId = state.runData.programs[0].id;
           if (state.highlanderLaunched) renderHighlander();
         }
@@ -1049,6 +1087,20 @@
         if (httpPoller) httpPoller.stop();
         state.stageStates = ["queued", "queued", "queued", "queued", "queued"];
         state.stageNotes = ["awaiting backend", "awaiting backend", "awaiting backend", "awaiting backend", "awaiting backend"];
+        // Run-scoped resets mirroring resetDemo: a second run must not inherit the
+        // previous run's selection, inspector, or Highlander gate state.
+        state.selectedId = null;
+        state.previewId = null;
+        state.inspectorVisible = false;
+        state.inspectorCollapsed = false;
+        state.highlanderReady = false;
+        state.highlanderLaunched = false;
+        elements.gapConfirmInput.checked = false;
+        var highlanderNav = document.querySelector('[data-nav="highlander"]');
+        highlanderNav.disabled = true;
+        highlanderNav.classList.add("locked");
+        elements.inspector.classList.remove("visible", "collapsed");
+        elements.graphScreen.classList.remove("inspector-open");
         buildScaffold();
         renderProgress();
         renderGraph();
@@ -1206,8 +1258,8 @@
           biomarkers: validation.biomarkers,
           papers: validation.papers,
           hypotheses: validation.hypotheses,
-          biomarkerRange: [Number(document.getElementById("biomarker-low").value), Number(document.getElementById("biomarker-high").value)],
-          hypothesisRange: [Number(document.getElementById("hypothesis-low").value), Number(document.getElementById("hypothesis-high").value)]
+          biomarkerRange: validation.biomarkerRange,
+          hypothesisRange: validation.hypothesisRange
         });
         state.packetSnapshot = "PKT-" + String(runId).slice(-6) + "-R1";
         state.submitting = false;
@@ -1241,6 +1293,11 @@
         event.preventDefault();
         var validation = validateSetup();
         if (!validation.valid || state.submitting) return;
+        // Capture the four range values exactly once; the POSTed setup and the
+        // frozen snapshot in enterRun must use these same values, never a DOM
+        // re-read after the await (the user could move a slider mid-flight).
+        validation.biomarkerRange = [Number(document.getElementById("biomarker-low").value), Number(document.getElementById("biomarker-high").value)];
+        validation.hypothesisRange = [Number(document.getElementById("hypothesis-low").value), Number(document.getElementById("hypothesis-high").value)];
         state.submitting = true;
         elements.runButton.textContent = "Creating immutable snapshot…";
         validateSetup();
@@ -1249,14 +1306,14 @@
           var setupWire = {
             clinical_indication: { submitted_text: validation.indication },
             biomarker_exploration_range: {
-              lower: Number(document.getElementById("biomarker-low").value),
-              upper: Number(document.getElementById("biomarker-high").value)
+              lower: validation.biomarkerRange[0],
+              upper: validation.biomarkerRange[1]
             },
             maximum_biomarkers: validation.biomarkers,
             maximum_literature_papers: validation.papers,
             hypothesis_boldness_range: {
-              lower: Number(document.getElementById("hypothesis-low").value),
-              upper: Number(document.getElementById("hypothesis-high").value)
+              lower: validation.hypothesisRange[0],
+              upper: validation.hypothesisRange[1]
             },
             maximum_hypotheses_per_biomarker: validation.hypotheses
           };
