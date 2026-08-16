@@ -10,6 +10,7 @@ const terminalSnapshot = JSON.parse(
     "utf8",
   ),
 );
+const appHtml = fs.readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 
 function ingestTerminalSnapshot() {
   const harness = loadFunctionalApp();
@@ -17,6 +18,21 @@ function ingestTerminalSnapshot() {
   harness.hooks.ingestSnapshot(structuredClone(terminalSnapshot));
   return harness;
 }
+
+test("stage metrics are exposed as visible button groups instead of selects", () => {
+  assert.doesNotMatch(appHtml, /<select[^>]+data-metric-stage=/);
+  for (const [stage, expectedCount] of [
+    ["biomarker", 3],
+    ["hypothesis", 3],
+    ["roi", 3],
+    ["recruitability", 4],
+    ["simulation", 3],
+  ]) {
+    const matches = appHtml.match(new RegExp(`data-metric-stage="${stage}"`, "g")) || [];
+    assert.equal(matches.length, expectedCount, `${stage} must expose every metric as a button`);
+  }
+  assert.equal((appHtml.match(/aria-pressed="true"/g) || []).length, 5);
+});
 
 test("HTTP ingestion keeps result status separate from execution, origin, and basis", () => {
   const { hooks } = ingestTerminalSnapshot();
@@ -152,15 +168,34 @@ test("HTTP inspector does not claim real backend records are illustrative mock d
   assert.match(html, /IRAK4 tractability dossier/);
 });
 
-test("a validated fallback keeps the failed module attempt visible in the inspector", () => {
+test("HTTP inspector omits redundant live and cached execution prose", () => {
+  const { hooks } = ingestTerminalSnapshot();
+
+  hooks.renderInspector(hooks.findNode("simulation-slot-0"));
+  const cachedHtml = hooks.elements.inspectorBody.innerHTML;
+  assert.doesNotMatch(cachedHtml, /orchestrator supplied validated CACHED output/);
+  assert.doesNotMatch(cachedHtml, /module-owned replay\/revalidation command/i);
+  assert.match(cachedHtml, /Output origin/);
+  assert.match(cachedHtml, /CACHED/);
+
+  hooks.renderInspector(hooks.findNode("roi-slot-0"));
+  const liveHtml = hooks.elements.inspectorBody.innerHTML;
+  assert.doesNotMatch(liveHtml, /Backend-reported LIVE result/);
+  assert.match(liveHtml, /Output origin/);
+  assert.match(liveHtml, /LIVE/);
+});
+
+test("a validated fallback keeps structured truth without a warning banner", () => {
   const { hooks } = ingestTerminalSnapshot();
   const clinical = hooks.findNode("recruitability-slot-0");
 
   hooks.renderInspector(clinical);
   const html = hooks.elements.inspectorBody.innerHTML;
-  assert.match(html, /Module execution FAILED/);
-  assert.match(html, /DEMO_FALLBACK output/);
-  assert.match(html, /not a live result/i);
+  assert.match(html, /Module execution<\/span><strong>FAILED/);
+  assert.match(html, /Output origin<\/span><strong>DEMO FALLBACK/);
+  assert.doesNotMatch(html, /validated DEMO_FALLBACK output/);
+  assert.doesNotMatch(html, /not a live result/i);
+  assert.doesNotMatch(html, /class="state-warning"/);
   assert.match(html, /Enrollment feasibility/);
 });
 

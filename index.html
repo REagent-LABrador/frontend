@@ -204,7 +204,7 @@
     .screen {
       display: none;
       min-height: 100vh;
-      padding-top: 76px;
+      padding-top: 0;
     }
 
     .screen.active { display: block; }
@@ -278,7 +278,14 @@
       align-items: start;
       margin: 14px 0;
       color: #4f5a53;
-      font-size: 13px;
+      font-size: 39px;
+      line-height: 1.08;
+    }
+
+    .journey-detail {
+      display: inline-block;
+      font-size: 19.5px;
+      line-height: 1.2;
     }
 
     .journey-preview li::before {
@@ -339,11 +346,11 @@
     .control-label, .setup-control legend {
       padding: 0;
       color: #fbf8ed;
-      font-size: 12px;
+      font-size: 24px;
       font-weight: 900;
     }
 
-    .control-index { margin-right: 8px; color: var(--green); font-size: 10px; }
+    .control-index { margin-right: 8px; color: var(--green); font-size: 20px; }
     .control-help { color: #9eaaa5; font-size: 10px; font-weight: 650; }
 
     .text-input {
@@ -625,22 +632,32 @@
     .rail-band h2 { margin: 4px 0 8px; font-size: 14px; letter-spacing: -.015em; }
     .rail-band p { margin: 0 0 9px; color: #a8b8b0; font-size: 8px; line-height: 1.35; }
 
-    .metric-select {
+    .metric-buttons {
+      display: grid;
+      gap: 4px;
       width: 100%;
-      height: 30px;
-      padding: 0 25px 0 7px;
-      color: #102218;
-      background: #f5f1e5;
-      border: 0;
+    }
+
+    .metric-button {
+      min-height: 27px;
+      padding: 5px 7px;
+      color: #c4d0ca;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.16);
       border-radius: 6px;
       font-size: 9px;
       font-weight: 850;
+      line-height: 1.2;
+      text-align: left;
     }
+
+    .metric-button:hover { color: white; border-color: rgba(255,255,255,.38); }
+    .metric-button[aria-pressed="true"] { color: #102218; background: var(--green); border-color: var(--green); }
 
     .axis-mini {
       position: relative;
-      height: 66px;
-      margin-top: 7px;
+      height: 126px;
+      margin-top: 12px;
       color: #92a59b;
       font-size: 7px;
     }
@@ -649,15 +666,25 @@
       content: "";
       position: absolute;
       left: 8px;
-      top: 7px;
-      bottom: 9px;
+      top: 14px;
+      bottom: 36px;
       width: 1px;
       background: #60756b;
     }
 
-    .axis-low { position: absolute; top: 0; left: 15px; }
-    .axis-high { position: absolute; bottom: 3px; left: 15px; }
-    .axis-source { position: absolute; right: 0; bottom: 3px; color: #6f8279; text-align: right; }
+    .axis-low, .axis-high {
+      position: absolute;
+      left: 15px;
+      width: calc(100% - 15px);
+      font-size: 22px;
+      font-weight: 850;
+      letter-spacing: -.04em;
+      line-height: .95;
+    }
+
+    .axis-low { top: 0; }
+    .axis-high { bottom: 28px; }
+    .axis-source { position: absolute; right: 0; bottom: 0; color: #6f8279; text-align: right; }
 
     .connectors {
       position: absolute;
@@ -796,7 +823,7 @@
     .inspector {
       position: fixed;
       z-index: 80;
-      top: 94px;
+      top: 18px;
       right: 16px;
       bottom: 100px;
       width: var(--inspector);
@@ -871,7 +898,7 @@
       .graph-screen.inspector-open .run-header,
       .graph-screen.inspector-open .graph-scroller,
       .graph-screen.inspector-open .graph-footer { padding-right: calc(var(--inspector) + 34px); }
-      .inspector { top: 88px; right: 10px; bottom: 10px; border-radius: 10px; }
+      .inspector { top: 10px; right: 10px; bottom: 10px; border-radius: 10px; }
     }
 
     /* Screen 3 */
@@ -1059,30 +1086,6 @@
   </style>
 </head>
 <body>
-  <div class="desktop-notice" role="status">Desktop wireframe only. The accepted review viewport is at least 1280 × 720; all content remains available by scrolling.</div>
-
-  <header class="app-header">
-    <div class="brand" aria-label="LABrador interactive product alignment mockup">
-      <span class="brand-mark" aria-hidden="true">L</span>
-      <div>
-        <div class="brand-name">LABrador</div>
-        <div class="brand-sub">program exploration · interactive alignment mockup</div>
-      </div>
-    </div>
-
-    <nav class="screen-nav" aria-label="Three-screen product flow">
-      <button class="nav-button" type="button" data-nav="setup" aria-current="page">1 · Run Setup</button>
-      <button class="nav-button locked" type="button" data-nav="graph" disabled>2 · Program Graph</button>
-      <button class="nav-button locked" type="button" data-nav="highlander" disabled>3 · Highlander</button>
-    </nav>
-
-    <div class="truth-stack" data-truth-strip aria-label="Prototype truth labels">
-      <span class="truth-chip">PROPOSED TARGET</span>
-      <span class="truth-chip mock">ILLUSTRATIVE MOCK DATA</span>
-      <span class="truth-chip unwired">NO MODULES WIRED</span>
-    </div>
-  </header>
-
   <main>
     <section id="screen-setup" class="screen setup-screen active" data-screen="setup" aria-labelledby="setup-title">
       <div class="setup-layout">
@@ -1090,9 +1093,9 @@
           <p class="eyebrow">Screen 01 · define the exploration envelope</p>
           <h1 id="setup-title">Start with a bounded question.</h1>
           <ol class="journey-preview" aria-label="Product journey">
-            <li><span><strong>Set a clinical frame.</strong><br>Choose indication and exploration breadth.</span></li>
-            <li><span><strong>Read the program as sheet music.</strong><br>Stable lanes keep each hypothesis and its downstream records aligned.</span></li>
-            <li><span><strong>Compare tradeoffs, not a winner.</strong><br>Highlander preserves the non-dominated frontier and visible gaps.</span></li>
+            <li><span><strong>Set a clinical frame.</strong><br><span class="journey-detail">Choose indication and exploration breadth.</span></span></li>
+            <li><span><strong>Read the program as sheet music.</strong><br><span class="journey-detail">Stable lanes keep each hypothesis and its downstream records aligned.</span></span></li>
+            <li><span><strong>Compare tradeoffs, not a winner.</strong><br><span class="journey-detail">Highlander preserves the non-dominated frontier and visible gaps.</span></span></li>
           </ol>
           <p class="micro muted"><strong>Prototype boundary:</strong> this standalone HTML calls no repository modules, APIs, models, or external services.</p>
         </aside>
@@ -1112,8 +1115,7 @@
                 <label class="control-label" for="clinical-indication"><span class="control-index">01</span>Clinical indication</label>
                 <span class="control-help">Required · retained on error</span>
               </div>
-              <input id="clinical-indication" class="text-input" name="clinicalIndication" type="text" value="Rheumatoid arthritis" autocomplete="off" aria-describedby="indication-help indication-error">
-              <p id="indication-help" class="control-help">The fixed root of this exploration; it does not imply an approved target or claim.</p>
+              <input id="clinical-indication" class="text-input" name="clinicalIndication" type="text" value="Rheumatoid arthritis" autocomplete="off" aria-describedby="indication-error">
               <p id="indication-error" class="field-error" aria-live="polite"></p>
             </fieldset>
 
@@ -1123,11 +1125,10 @@
                 <div class="range-values"><span id="biomarker-low-value">1 · Established</span><span id="biomarker-high-value">10 · Untested but plausible</span></div>
                 <div class="dual-range">
                   <div class="range-track"></div><div id="biomarker-fill" class="range-fill"></div>
-                  <input id="biomarker-low" type="range" min="1" max="10" step="1" value="1" aria-label="Biomarker range lower bound" aria-describedby="biomarker-interval">
-                  <input id="biomarker-high" type="range" min="1" max="10" step="1" value="10" aria-label="Biomarker range upper bound" aria-describedby="biomarker-interval">
+                  <input id="biomarker-low" type="range" min="1" max="10" step="1" value="1" aria-label="Biomarker range lower bound">
+                  <input id="biomarker-high" type="range" min="1" max="10" step="1" value="10" aria-label="Biomarker range upper bound">
                 </div>
                 <div class="range-scale" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div>
-                <p id="biomarker-interval" class="control-help">Selected interval: 1 · Established through 10 · Untested but plausible.</p>
               </div>
             </fieldset>
 
@@ -1135,7 +1136,7 @@
               <div class="stepper-row">
                 <div>
                   <label class="control-label" for="max-biomarkers"><span class="control-index">03</span>Maximum biomarkers</label>
-                  <div class="control-help">Up to this many candidates · provisional limit 5</div>
+                  <div class="control-help">Provisional limit 5</div>
                   <p id="max-biomarkers-error" class="field-error"></p>
                 </div>
                 <div class="stepper">
@@ -1150,7 +1151,7 @@
               <div class="stepper-row">
                 <div>
                   <label class="control-label" for="max-papers"><span class="control-index">04</span>Maximum literature papers</label>
-                  <div class="control-help">One shared cap · provisional limit 100</div>
+                  <div class="control-help">Provisional limit 100</div>
                   <p id="max-papers-error" class="field-error"></p>
                 </div>
                 <div class="stepper">
@@ -1167,11 +1168,10 @@
                 <div class="range-values"><span id="hypothesis-low-value">1 · Standard</span><span id="hypothesis-high-value">10 · Radical</span></div>
                 <div class="dual-range">
                   <div class="range-track"></div><div id="hypothesis-fill" class="range-fill"></div>
-                  <input id="hypothesis-low" type="range" min="1" max="10" step="1" value="1" aria-label="Hypothesis range lower bound" aria-describedby="hypothesis-interval">
-                  <input id="hypothesis-high" type="range" min="1" max="10" step="1" value="10" aria-label="Hypothesis range upper bound" aria-describedby="hypothesis-interval">
+                  <input id="hypothesis-low" type="range" min="1" max="10" step="1" value="1" aria-label="Hypothesis range lower bound">
+                  <input id="hypothesis-high" type="range" min="1" max="10" step="1" value="10" aria-label="Hypothesis range upper bound">
                 </div>
                 <div class="range-scale" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div>
-                <p id="hypothesis-interval" class="control-help">Selected interval: 1 · Standard through 10 · Radical.</p>
               </div>
             </fieldset>
 
@@ -1179,7 +1179,7 @@
               <div class="stepper-row">
                 <div>
                   <label class="control-label" for="max-hypotheses"><span class="control-index">06</span>Maximum hypotheses per biomarker</label>
-                  <div class="control-help">Up to this many branches · provisional limit 5</div>
+                  <div class="control-help">Provisional limit 5</div>
                   <p id="max-hypotheses-error" class="field-error"></p>
                 </div>
                 <div class="stepper">
@@ -1192,13 +1192,11 @@
 
             <div class="setup-summary" data-region="validation-summary">
               <strong id="branch-preview">Up to 3 biomarkers and up to 9 hypothesis branches.</strong>
-              <div id="paper-preview" class="micro">The illustrative mapper may inspect up to 40 paper records. Returned counts may be lower.</div>
             </div>
 
             <div id="snapshot-note" class="snapshot-note" role="status"></div>
 
             <div class="setup-actions">
-              <p>Run creates an immutable setup snapshot, then plays an accelerated deterministic stage demo. Target product refresh fallback: 5 seconds.</p>
               <button id="run-button" class="run-button" type="submit">Run illustrative exploration →</button>
             </div>
           </form>
@@ -1241,42 +1239,48 @@
             </div>
             <div class="rail-band" data-stage="biomarker">
               <span class="rail-kicker">Stage 01</span><h2>Biomarker / target</h2>
-              <label class="sr-only" for="metric-biomarker">Biomarker display metric</label>
-              <select id="metric-biomarker" class="metric-select" data-metric-stage="biomarker">
-                <option value="exploration">Exploration posture</option><option value="evidence">Evidence support</option><option value="pursuit">Prior pursuit</option>
-              </select>
+              <div id="metric-biomarker" class="metric-buttons" role="group" aria-label="Biomarker display metric">
+                <button class="metric-button" type="button" data-metric-stage="biomarker" data-metric-value="exploration" aria-pressed="true">Exploration posture</button>
+                <button class="metric-button" type="button" data-metric-stage="biomarker" data-metric-value="evidence" aria-pressed="false">Evidence support</button>
+                <button class="metric-button" type="button" data-metric-stage="biomarker" data-metric-value="pursuit" aria-pressed="false">Prior pursuit</button>
+              </div>
               <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">named scale<br>illustrative</span></div>
             </div>
             <div class="rail-band" data-stage="hypothesis">
               <span class="rail-kicker">Stage 02</span><h2>Hypothesis</h2>
-              <label class="sr-only" for="metric-hypothesis">Hypothesis display metric</label>
-              <select id="metric-hypothesis" class="metric-select" data-metric-stage="hypothesis">
-                <option value="boldness">Boldness</option><option value="evidence">Evidence support</option><option value="plausibility">Biological plausibility</option>
-              </select>
+              <div id="metric-hypothesis" class="metric-buttons" role="group" aria-label="Hypothesis display metric">
+                <button class="metric-button" type="button" data-metric-stage="hypothesis" data-metric-value="boldness" aria-pressed="true">Boldness</button>
+                <button class="metric-button" type="button" data-metric-stage="hypothesis" data-metric-value="evidence" aria-pressed="false">Evidence support</button>
+                <button class="metric-button" type="button" data-metric-stage="hypothesis" data-metric-value="plausibility" aria-pressed="false">Biological plausibility</button>
+              </div>
               <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">1–10<br>proxy</span></div>
             </div>
             <div class="rail-band" data-stage="roi">
               <span class="rail-kicker">Stage 03</span><h2>ROI / impact</h2>
-              <label class="sr-only" for="metric-roi">ROI display metric</label>
-              <select id="metric-roi" class="metric-select" data-metric-stage="roi">
-                <option value="rnpv">P50 rNPV</option><option value="positive">Probability positive rNPV</option><option value="impact">Clinical impact</option>
-              </select>
+              <div id="metric-roi" class="metric-buttons" role="group" aria-label="ROI display metric">
+                <button class="metric-button" type="button" data-metric-stage="roi" data-metric-value="rnpv" aria-pressed="true">P50 rNPV</button>
+                <button class="metric-button" type="button" data-metric-stage="roi" data-metric-value="positive" aria-pressed="false">Probability positive rNPV</button>
+                <button class="metric-button" type="button" data-metric-stage="roi" data-metric-value="impact" aria-pressed="false">Clinical impact</button>
+              </div>
               <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">$M / %<br>modeled</span></div>
             </div>
             <div class="rail-band" data-stage="recruitability">
               <span class="rail-kicker">Stage 04</span><h2>Recruitability</h2>
-              <label class="sr-only" for="metric-recruitability">Recruitability display metric</label>
-              <select id="metric-recruitability" class="metric-select" data-metric-stage="recruitability">
-                <option value="recruit">Recruitability</option><option value="duration">Enrollment duration</option><option value="screens">Screens per enrollee</option><option value="risk">Recruitability risk</option>
-              </select>
+              <div id="metric-recruitability" class="metric-buttons" role="group" aria-label="Recruitability display metric">
+                <button class="metric-button" type="button" data-metric-stage="recruitability" data-metric-value="recruit" aria-pressed="true">Recruitability</button>
+                <button class="metric-button" type="button" data-metric-stage="recruitability" data-metric-value="duration" aria-pressed="false">Enrollment duration</button>
+                <button class="metric-button" type="button" data-metric-stage="recruitability" data-metric-value="screens" aria-pressed="false">Screens per enrollee</button>
+                <button class="metric-button" type="button" data-metric-stage="recruitability" data-metric-value="risk" aria-pressed="false">Recruitability risk</button>
+              </div>
               <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">0–100<br>simulated</span></div>
             </div>
             <div class="rail-band" data-stage="simulation">
               <span class="rail-kicker">Stage 05</span><h2>Atomistic simulation</h2>
-              <label class="sr-only" for="metric-simulation">Simulation display metric</label>
-              <select id="metric-simulation" class="metric-select" data-metric-stage="simulation">
-                <option value="support">Atomistic support</option><option value="occupancy">Pose occupancy</option><option value="convergence">Convergence</option>
-              </select>
+              <div id="metric-simulation" class="metric-buttons" role="group" aria-label="Simulation display metric">
+                <button class="metric-button" type="button" data-metric-stage="simulation" data-metric-value="support" aria-pressed="true">Atomistic support</button>
+                <button class="metric-button" type="button" data-metric-stage="simulation" data-metric-value="occupancy" aria-pressed="false">Pose occupancy</button>
+                <button class="metric-button" type="button" data-metric-stage="simulation" data-metric-value="convergence" aria-pressed="false">Convergence</button>
+              </div>
               <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">missing shelf<br>not wired</span></div>
             </div>
           </aside>
@@ -1584,7 +1588,6 @@
         maxHypotheses: document.getElementById("max-hypotheses"),
         runButton: document.getElementById("run-button"),
         branchPreview: document.getElementById("branch-preview"),
-        paperPreview: document.getElementById("paper-preview"),
         snapshotNote: document.getElementById("snapshot-note"),
         progress: document.getElementById("progress-strip"),
         graphSurface: document.getElementById("graph-surface"),
@@ -1690,9 +1693,6 @@
         } else {
           elements.branchPreview.textContent = "Enter valid ceilings to preview requested capacity.";
         }
-        elements.paperPreview.textContent = papers.valid
-          ? "The illustrative mapper may inspect up to " + papers.value + " paper record" + (papers.value === 1 ? "" : "s") + ". Returned counts may be lower."
-          : "The literature ceiling is invalid; no count has been assumed.";
         elements.runButton.disabled = !valid || state.submitting;
         return {
           valid: valid,
@@ -1725,7 +1725,6 @@
         fill.style.width = (highPercent - lowPercent) + "%";
         document.getElementById(name + "-low-value").textContent = names[lowValue];
         document.getElementById(name + "-high-value").textContent = names[highValue];
-        document.getElementById(name + "-interval").textContent = "Selected interval: " + names[lowValue] + " through " + names[highValue] + ".";
         low.setAttribute("aria-valuetext", names[lowValue] + "; complete interval " + names[lowValue] + " through " + names[highValue]);
         high.setAttribute("aria-valuetext", names[highValue] + "; complete interval " + names[lowValue] + " through " + names[highValue]);
         low.style.zIndex = lowValue === Number(low.max) ? "5" : "3";
@@ -2451,8 +2450,11 @@
         state.highlanderReady = false;
         state.highlanderLaunched = false;
         elements.gapConfirmInput.checked = false;
-        document.querySelector('[data-nav="highlander"]').disabled = true;
-        document.querySelector('[data-nav="highlander"]').classList.add("locked");
+        var highlanderNav = document.querySelector('[data-nav="highlander"]');
+        if (highlanderNav) {
+          highlanderNav.disabled = true;
+          highlanderNav.classList.add("locked");
+        }
         elements.inspector.classList.remove("visible", "collapsed");
         elements.graphScreen.classList.remove("inspector-open");
         buildScaffold();
@@ -2524,8 +2526,10 @@
           document.getElementById("packet-snapshot").textContent = state.packetSnapshot;
           document.getElementById("chat-scope").textContent = "Read-only evidence scope · " + state.runId + " · mock Highlander job only";
           var graphNav = document.querySelector('[data-nav="graph"]');
-          graphNav.disabled = false;
-          graphNav.classList.remove("locked");
+          if (graphNav) {
+            graphNav.disabled = false;
+            graphNav.classList.remove("locked");
+          }
           switchScreen("graph");
           resetDemo();
           announce("Run " + state.runId + " created. Program Graph opened with requested capacity scaffolding.");
@@ -2824,8 +2828,10 @@
         if (!state.highlanderLaunched) {
           state.highlanderLaunched = true;
           var nav = document.querySelector('[data-nav="highlander"]');
-          nav.disabled = false;
-          nav.classList.remove("locked");
+          if (nav) {
+            nav.disabled = false;
+            nav.classList.remove("locked");
+          }
           showToast("One idempotent mock Highlander job created from " + state.packetSnapshot + ".");
         }
         switchScreen("highlander");
@@ -2879,13 +2885,18 @@
           button.addEventListener("click", function () { switchScreen(button.dataset.nav); });
         });
 
-        document.querySelectorAll("[data-metric-stage]").forEach(function (select) {
-          select.addEventListener("change", function () {
+        document.querySelectorAll(".metric-button").forEach(function (button) {
+          button.addEventListener("click", function () {
+            var stage = button.dataset.metricStage;
+            var value = button.dataset.metricValue;
             var priorX = new Map(state.nodes.map(function (node) { return [node.id, node.x]; }));
-            state.metrics[select.dataset.metricStage] = select.value;
+            state.metrics[stage] = value;
+            document.querySelectorAll('[data-metric-stage="' + stage + '"]').forEach(function (candidate) {
+              candidate.setAttribute("aria-pressed", candidate === button ? "true" : "false");
+            });
             renderGraph();
             var xStable = state.nodes.every(function (node) { return priorX.get(node.id) === node.x; });
-            announce(METRICS[select.dataset.metricStage][select.value].label + " selected. Presentation changed; stored records and x lanes " + (xStable ? "remain unchanged." : "changed unexpectedly."));
+            announce(METRICS[stage][value].label + " selected. Presentation changed; stored records and x lanes " + (xStable ? "remain unchanged." : "changed unexpectedly."));
           });
         });
 

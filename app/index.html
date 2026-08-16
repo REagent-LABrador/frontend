@@ -10,30 +10,6 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <div class="desktop-notice" role="status">Desktop wireframe only. The accepted review viewport is at least 1280 × 720; all content remains available by scrolling.</div>
-
-  <header class="app-header">
-    <div class="brand" aria-label="LABrador interactive product alignment mockup">
-      <span class="brand-mark" aria-hidden="true">L</span>
-      <div>
-        <div class="brand-name">LABrador</div>
-        <div class="brand-sub">program exploration · <span id="backend-indicator">backend: resolving…</span></div>
-      </div>
-    </div>
-
-    <nav class="screen-nav" aria-label="Three-screen product flow">
-      <button class="nav-button" type="button" data-nav="setup" aria-current="page">1 · Run Setup</button>
-      <button class="nav-button locked" type="button" data-nav="graph" disabled>2 · Program Graph</button>
-      <button class="nav-button locked" type="button" data-nav="highlander" disabled>3 · Highlander</button>
-    </nav>
-
-    <div class="truth-stack" data-truth-strip aria-label="Prototype truth labels">
-      <span class="truth-chip">PROPOSED TARGET</span>
-      <span class="truth-chip mock">ILLUSTRATIVE MOCK DATA</span>
-      <span class="truth-chip unwired">NO MODULES WIRED</span>
-    </div>
-  </header>
-
   <main>
     <section id="screen-setup" class="screen setup-screen active" data-screen="setup" aria-labelledby="setup-title">
       <div class="setup-layout">
@@ -41,9 +17,9 @@
           <p class="eyebrow">Screen 01 · define the exploration envelope</p>
           <h1 id="setup-title">Start with a bounded question.</h1>
           <ol class="journey-preview" aria-label="Product journey">
-            <li><span><strong>Set a clinical frame.</strong><br>Choose indication and exploration breadth.</span></li>
-            <li><span><strong>Read the program as sheet music.</strong><br>Stable lanes keep each hypothesis and its downstream records aligned.</span></li>
-            <li><span><strong>Compare tradeoffs, not a winner.</strong><br>Highlander preserves the non-dominated frontier and visible gaps.</span></li>
+            <li><span><strong>Set a clinical frame.</strong><br><span class="journey-detail">Choose indication and exploration breadth.</span></span></li>
+            <li><span><strong>Read the program as sheet music.</strong><br><span class="journey-detail">Stable lanes keep each hypothesis and its downstream records aligned.</span></span></li>
+            <li><span><strong>Compare tradeoffs, not a winner.</strong><br><span class="journey-detail">Highlander preserves the non-dominated frontier and visible gaps.</span></span></li>
           </ol>
         </aside>
 
@@ -62,8 +38,7 @@
                 <label class="control-label" for="clinical-indication"><span class="control-index">01</span>Clinical indication</label>
                 <span class="control-help">Required · retained on error</span>
               </div>
-              <input id="clinical-indication" class="text-input" name="clinicalIndication" type="text" value="Rheumatoid arthritis" autocomplete="off" aria-describedby="indication-help indication-error">
-              <p id="indication-help" class="control-help">The fixed root of this exploration; it does not imply an approved target or claim.</p>
+              <input id="clinical-indication" class="text-input" name="clinicalIndication" type="text" value="Rheumatoid arthritis" autocomplete="off" aria-describedby="indication-error">
               <p id="indication-error" class="field-error" aria-live="polite"></p>
             </fieldset>
 
@@ -73,11 +48,10 @@
                 <div class="range-values"><span id="biomarker-low-value">1 · Established</span><span id="biomarker-high-value">10 · Untested but plausible</span></div>
                 <div class="dual-range">
                   <div class="range-track"></div><div id="biomarker-fill" class="range-fill"></div>
-                  <input id="biomarker-low" type="range" min="1" max="10" step="1" value="1" aria-label="Biomarker range lower bound" aria-describedby="biomarker-interval">
-                  <input id="biomarker-high" type="range" min="1" max="10" step="1" value="10" aria-label="Biomarker range upper bound" aria-describedby="biomarker-interval">
+                  <input id="biomarker-low" type="range" min="1" max="10" step="1" value="1" aria-label="Biomarker range lower bound">
+                  <input id="biomarker-high" type="range" min="1" max="10" step="1" value="10" aria-label="Biomarker range upper bound">
                 </div>
                 <div class="range-scale" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div>
-                <p id="biomarker-interval" class="control-help">Selected interval: 1 · Established through 10 · Untested but plausible.</p>
               </div>
             </fieldset>
 
@@ -85,7 +59,7 @@
               <div class="stepper-row">
                 <div>
                   <label class="control-label" for="max-biomarkers"><span class="control-index">03</span>Maximum biomarkers</label>
-                  <div class="control-help">Up to this many candidates · provisional limit 5</div>
+                  <div class="control-help">Provisional limit 5</div>
                   <p id="max-biomarkers-error" class="field-error"></p>
                 </div>
                 <div class="stepper">
@@ -100,7 +74,7 @@
               <div class="stepper-row">
                 <div>
                   <label class="control-label" for="max-papers"><span class="control-index">04</span>Maximum literature papers</label>
-                  <div class="control-help">One shared cap · provisional limit 100</div>
+                  <div class="control-help">Provisional limit 100</div>
                   <p id="max-papers-error" class="field-error"></p>
                 </div>
                 <div class="stepper">
@@ -117,11 +91,10 @@
                 <div class="range-values"><span id="hypothesis-low-value">1 · Standard</span><span id="hypothesis-high-value">10 · Radical</span></div>
                 <div class="dual-range">
                   <div class="range-track"></div><div id="hypothesis-fill" class="range-fill"></div>
-                  <input id="hypothesis-low" type="range" min="1" max="10" step="1" value="1" aria-label="Hypothesis range lower bound" aria-describedby="hypothesis-interval">
-                  <input id="hypothesis-high" type="range" min="1" max="10" step="1" value="10" aria-label="Hypothesis range upper bound" aria-describedby="hypothesis-interval">
+                  <input id="hypothesis-low" type="range" min="1" max="10" step="1" value="1" aria-label="Hypothesis range lower bound">
+                  <input id="hypothesis-high" type="range" min="1" max="10" step="1" value="10" aria-label="Hypothesis range upper bound">
                 </div>
                 <div class="range-scale" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div>
-                <p id="hypothesis-interval" class="control-help">Selected interval: 1 · Standard through 10 · Radical.</p>
               </div>
             </fieldset>
 
@@ -129,7 +102,7 @@
               <div class="stepper-row">
                 <div>
                   <label class="control-label" for="max-hypotheses"><span class="control-index">06</span>Maximum hypotheses per biomarker</label>
-                  <div class="control-help">Up to this many branches · provisional limit 5</div>
+                  <div class="control-help">Provisional limit 5</div>
                   <p id="max-hypotheses-error" class="field-error"></p>
                 </div>
                 <div class="stepper">
@@ -142,13 +115,11 @@
 
             <div class="setup-summary" data-region="validation-summary">
               <strong id="branch-preview">Up to 3 biomarkers and up to 9 hypothesis branches.</strong>
-              <div id="paper-preview" class="micro">The illustrative mapper may inspect up to 40 paper records. Returned counts may be lower.</div>
             </div>
 
             <div id="snapshot-note" class="snapshot-note" role="status"></div>
 
             <div class="setup-actions">
-              <p id="run-mode-description">Run creates an immutable setup snapshot, then plays an accelerated deterministic stage demo. Target product refresh fallback: 5 seconds.</p>
               <button id="run-button" class="run-button" type="submit">Run illustrative exploration →</button>
             </div>
           </form>
@@ -191,42 +162,48 @@
             </div>
             <div class="rail-band" data-stage="biomarker">
               <span class="rail-kicker">Stage 01</span><h2>Biomarker / target</h2>
-              <label class="sr-only" for="metric-biomarker">Biomarker display metric</label>
-              <select id="metric-biomarker" class="metric-select" data-metric-stage="biomarker">
-                <option value="exploration">Exploration posture</option><option value="evidence">Evidence support</option><option value="pursuit">Prior pursuit</option>
-              </select>
+              <div id="metric-biomarker" class="metric-buttons" role="group" aria-label="Biomarker display metric">
+                <button class="metric-button" type="button" data-metric-stage="biomarker" data-metric-value="exploration" aria-pressed="true">Exploration posture</button>
+                <button class="metric-button" type="button" data-metric-stage="biomarker" data-metric-value="evidence" aria-pressed="false">Evidence support</button>
+                <button class="metric-button" type="button" data-metric-stage="biomarker" data-metric-value="pursuit" aria-pressed="false">Prior pursuit</button>
+              </div>
               <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">named scale<br>illustrative</span></div>
             </div>
             <div class="rail-band" data-stage="hypothesis">
               <span class="rail-kicker">Stage 02</span><h2>Hypothesis</h2>
-              <label class="sr-only" for="metric-hypothesis">Hypothesis display metric</label>
-              <select id="metric-hypothesis" class="metric-select" data-metric-stage="hypothesis">
-                <option value="boldness">Boldness</option><option value="evidence">Evidence support</option><option value="plausibility">Biological plausibility</option>
-              </select>
+              <div id="metric-hypothesis" class="metric-buttons" role="group" aria-label="Hypothesis display metric">
+                <button class="metric-button" type="button" data-metric-stage="hypothesis" data-metric-value="boldness" aria-pressed="true">Boldness</button>
+                <button class="metric-button" type="button" data-metric-stage="hypothesis" data-metric-value="evidence" aria-pressed="false">Evidence support</button>
+                <button class="metric-button" type="button" data-metric-stage="hypothesis" data-metric-value="plausibility" aria-pressed="false">Biological plausibility</button>
+              </div>
               <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">1–10<br>proxy</span></div>
             </div>
             <div class="rail-band" data-stage="roi">
               <span class="rail-kicker">Stage 03</span><h2>ROI / impact</h2>
-              <label class="sr-only" for="metric-roi">ROI display metric</label>
-              <select id="metric-roi" class="metric-select" data-metric-stage="roi">
-                <option value="rnpv">P50 rNPV</option><option value="positive">Probability positive rNPV</option><option value="impact">Clinical impact</option>
-              </select>
+              <div id="metric-roi" class="metric-buttons" role="group" aria-label="ROI display metric">
+                <button class="metric-button" type="button" data-metric-stage="roi" data-metric-value="rnpv" aria-pressed="true">P50 rNPV</button>
+                <button class="metric-button" type="button" data-metric-stage="roi" data-metric-value="positive" aria-pressed="false">Probability positive rNPV</button>
+                <button class="metric-button" type="button" data-metric-stage="roi" data-metric-value="impact" aria-pressed="false">Clinical impact</button>
+              </div>
               <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">$M / %<br>modeled</span></div>
             </div>
             <div class="rail-band" data-stage="recruitability">
               <span class="rail-kicker">Stage 04</span><h2>Recruitability</h2>
-              <label class="sr-only" for="metric-recruitability">Recruitability display metric</label>
-              <select id="metric-recruitability" class="metric-select" data-metric-stage="recruitability">
-                <option value="recruit">Recruitability</option><option value="duration">Enrollment duration</option><option value="screens">Screens per enrollee</option><option value="risk">Recruitability risk</option>
-              </select>
+              <div id="metric-recruitability" class="metric-buttons" role="group" aria-label="Recruitability display metric">
+                <button class="metric-button" type="button" data-metric-stage="recruitability" data-metric-value="recruit" aria-pressed="true">Recruitability</button>
+                <button class="metric-button" type="button" data-metric-stage="recruitability" data-metric-value="duration" aria-pressed="false">Enrollment duration</button>
+                <button class="metric-button" type="button" data-metric-stage="recruitability" data-metric-value="screens" aria-pressed="false">Screens per enrollee</button>
+                <button class="metric-button" type="button" data-metric-stage="recruitability" data-metric-value="risk" aria-pressed="false">Recruitability risk</button>
+              </div>
               <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span class="axis-source">0–100<br>simulated</span></div>
             </div>
             <div class="rail-band" data-stage="simulation">
               <span class="rail-kicker">Stage 05</span><h2>Atomistic simulation</h2>
-              <label class="sr-only" for="metric-simulation">Simulation display metric</label>
-              <select id="metric-simulation" class="metric-select" data-metric-stage="simulation">
-                <option value="support">Atomistic support</option><option value="occupancy">Pose occupancy</option><option value="convergence">Convergence</option>
-              </select>
+              <div id="metric-simulation" class="metric-buttons" role="group" aria-label="Simulation display metric">
+                <button class="metric-button" type="button" data-metric-stage="simulation" data-metric-value="support" aria-pressed="true">Atomistic support</button>
+                <button class="metric-button" type="button" data-metric-stage="simulation" data-metric-value="occupancy" aria-pressed="false">Pose occupancy</button>
+                <button class="metric-button" type="button" data-metric-stage="simulation" data-metric-value="convergence" aria-pressed="false">Convergence</button>
+              </div>
               <div class="axis-mini"><span class="axis-low">low · top</span><span class="axis-high">high · bottom</span><span id="simulation-axis-source" class="axis-source">missing shelf<br>not wired</span></div>
             </div>
           </aside>

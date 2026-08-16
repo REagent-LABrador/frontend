@@ -98,17 +98,17 @@ for (const tag of tags) {
   }
 }
 
-// Contract 3: the persistent shell carries the three non-live truth labels.
+// Contract 3: the judging shell is intentionally free of the retired banner.
 const truthStrips = hooks("data-truth-strip");
-if (truthStrips.length !== 1) {
-  fail(`Expected exactly one data-truth-strip hook; found ${truthStrips.length}.`);
-} else if (truthStrips[0].index >= setupStart) {
-  fail("data-truth-strip must be in the persistent shell before the first data-screen section.");
-}
+if (truthStrips.length !== 0) fail(`Expected no data-truth-strip hook; found ${truthStrips.length}.`);
 const persistentShell = setupStart > 0 ? html.slice(0, setupStart) : "";
-for (const label of ["PROPOSED TARGET", "ILLUSTRATIVE MOCK DATA", "NO MODULES WIRED"]) {
-  if (!persistentShell.includes(label)) {
-    fail(`Persistent shell is missing the exact truth label ${JSON.stringify(label)}.`);
+for (const retiredClass of ["app-header", "screen-nav"]) {
+  const matches = tags.filter((tag) => tag.index < setupStart && (tag.attrs.get("class") || "").split(/\s+/).includes(retiredClass));
+  if (matches.length) fail(`Persistent shell still contains retired banner class ${JSON.stringify(retiredClass)}.`);
+}
+for (const retiredCopy of ["PROPOSED TARGET", "ILLUSTRATIVE MOCK DATA", "NO MODULES WIRED"]) {
+  if (persistentShell.includes(retiredCopy)) {
+    fail(`Persistent shell still contains retired banner copy ${JSON.stringify(retiredCopy)}.`);
   }
 }
 

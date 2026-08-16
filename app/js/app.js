@@ -180,7 +180,6 @@
         maxHypotheses: document.getElementById("max-hypotheses"),
         runButton: document.getElementById("run-button"),
         branchPreview: document.getElementById("branch-preview"),
-        paperPreview: document.getElementById("paper-preview"),
         snapshotNote: document.getElementById("snapshot-note"),
         progress: document.getElementById("progress-strip"),
         graphSurface: document.getElementById("graph-surface"),
@@ -297,9 +296,6 @@
         } else {
           elements.branchPreview.textContent = "Enter valid ceilings to preview requested capacity.";
         }
-        elements.paperPreview.textContent = papers.valid
-          ? (BOOT.mode === "http" ? "The orchestrated evidence stage may inspect up to " : "The illustrative mapper may inspect up to ") + papers.value + " paper record" + (papers.value === 1 ? "" : "s") + ". Returned counts may be lower."
-          : "The literature ceiling is invalid; no count has been assumed.";
         elements.runButton.disabled = !valid || state.submitting;
         return {
           valid: valid,
@@ -332,7 +328,6 @@
         fill.style.width = (highPercent - lowPercent) + "%";
         document.getElementById(name + "-low-value").textContent = names[lowValue];
         document.getElementById(name + "-high-value").textContent = names[highValue];
-        document.getElementById(name + "-interval").textContent = "Selected interval: " + names[lowValue] + " through " + names[highValue] + ".";
         low.setAttribute("aria-valuetext", names[lowValue] + "; complete interval " + names[lowValue] + " through " + names[highValue]);
         high.setAttribute("aria-valuetext", names[highValue] + "; complete interval " + names[lowValue] + " through " + names[highValue]);
         low.style.zIndex = lowValue === Number(low.max) ? "5" : "3";
@@ -1054,18 +1049,15 @@
 
         if (httpMode) {
           var warnings = Array.isArray(node.metadata.warnings) ? node.metadata.warnings : [];
+          var visibleWarnings = warnings.filter(function (warning) {
+            return !/module-owned replay\/revalidation command ran successfully over recorded scientific evidence; the scientific result remains CACHED\./i.test(warning);
+          });
           var qualifiers = Array.isArray(node.metadata.qualifiers) ? node.metadata.qualifiers : [];
           var origin = node.metadata.outputOrigin || node.outputOrigin || "UNREPORTED";
           var liveDefinition = definition
             ? definition.label + " · " + definition.unit + " · display domain " + definition.domain[0] + "–" + definition.domain[1] + "."
             : "Backend-provided run record.";
           if (node.stage === "simulation") liveDefinition = "Native tractability dossier; no scalar atomistic metric is imputed.";
-          var truthMessage = origin === "DEMO_FALLBACK"
-            ? "Module execution " + node.execution + "; the orchestrator supplied validated DEMO_FALLBACK output. This is not a live result."
-            : origin === "CACHED"
-              ? "Module execution " + node.execution + "; the orchestrator supplied validated CACHED output."
-              : "Backend-reported " + origin.replace(/_/g, " ") + " result.";
-          if (warnings.length) truthMessage += " " + warnings.join(" · ");
           var interpretability = node.metadata.stationPayload && node.metadata.stationPayload.interpretability;
           var readableInterpretability = renderInterpretability(interpretability);
 
@@ -1073,7 +1065,6 @@
           elements.inspectorSubtitle.textContent = node.stage + " · " + node.id;
           elements.collapsedIdentity.textContent = node.label + " · " + node.execution;
           elements.inspectorBody.innerHTML =
-            '<div class="state-warning">' + escapeHTML(truthMessage) + "</div>" +
             '<div class="inspector-status-grid">' +
               '<div class="status-card"><span>Module execution</span><strong>' + escapeHTML(node.execution || "UNREPORTED") + "</strong></div>" +
               '<div class="status-card"><span>Output origin</span><strong>' + escapeHTML(origin.replace(/_/g, " ")) + "</strong></div>" +
@@ -1084,7 +1075,7 @@
             "</div>" +
             '<div class="primary-result"><span>Active display value</span><strong>' + escapeHTML(value) + '</strong><p>' + escapeHTML(liveDefinition) + " Uncertainty: " + escapeHTML(node.uncertainty || "not supplied") + ".</p></div>" +
             readableInterpretability +
-            '<details class="inspector-section" open><summary>Run qualifications</summary><p><strong>Reason:</strong> ' + escapeHTML(node.reason || "No stage reason code reported.") + '</p><p><strong>Qualifiers:</strong> ' + escapeHTML(qualifiers.length ? qualifiers.join(" · ") : "none reported") + '</p><p><strong>Warnings:</strong> ' + escapeHTML(warnings.length ? warnings.join(" · ") : "none reported") + "</p></details>" +
+            '<details class="inspector-section" open><summary>Run qualifications</summary><p><strong>Reason:</strong> ' + escapeHTML(node.reason || "No stage reason code reported.") + '</p><p><strong>Qualifiers:</strong> ' + escapeHTML(qualifiers.length ? qualifiers.join(" · ") : "none reported") + '</p><p><strong>Warnings:</strong> ' + escapeHTML(visibleWarnings.length ? visibleWarnings.join(" · ") : "none reported") + "</p></details>" +
             '<details class="inspector-section"><summary>Lineage & audit</summary><ul><li>Parent: ' + escapeHTML(parent ? parent.label : "none · root") + "</li><li>Direct descendants: " + childCount + "</li><li>Output origin: " + escapeHTML(origin) + "</li><li>Timestamp: " + escapeHTML(state.lastUpdated || "awaiting update") + "</li><li>Hash: " + escapeHTML(program ? program.hash : "unreported") + "</li></ul></details>" +
             payloadSection;
           return;
@@ -1301,8 +1292,10 @@
         state.highlanderLaunched = false;
         elements.gapConfirmInput.checked = false;
         var highlanderNav = document.querySelector('[data-nav="highlander"]');
-        highlanderNav.disabled = true;
-        highlanderNav.classList.add("locked");
+        if (highlanderNav) {
+          highlanderNav.disabled = true;
+          highlanderNav.classList.add("locked");
+        }
         elements.inspector.classList.remove("visible", "collapsed");
         elements.graphScreen.classList.remove("inspector-open");
         buildScaffold();
@@ -1428,8 +1421,11 @@
         state.highlanderReady = false;
         state.highlanderLaunched = false;
         elements.gapConfirmInput.checked = false;
-        document.querySelector('[data-nav="highlander"]').disabled = true;
-        document.querySelector('[data-nav="highlander"]').classList.add("locked");
+        var highlanderNav = document.querySelector('[data-nav="highlander"]');
+        if (highlanderNav) {
+          highlanderNav.disabled = true;
+          highlanderNav.classList.add("locked");
+        }
         elements.inspector.classList.remove("visible", "collapsed");
         elements.graphScreen.classList.remove("inspector-open");
         buildScaffold();
@@ -1484,8 +1480,10 @@
           ? "Read-only evidence scope · " + state.runId + " · backend snapshot only"
           : "Read-only evidence scope · " + state.runId + " · one Highlander job only";
         var graphNav = document.querySelector('[data-nav="graph"]');
-        graphNav.disabled = false;
-        graphNav.classList.remove("locked");
+        if (graphNav) {
+          graphNav.disabled = false;
+          graphNav.classList.remove("locked");
+        }
         switchScreen("graph");
         announce("Run " + state.runId + " created. Program Graph opened with requested capacity scaffolding.");
         validateSetup();
@@ -1881,8 +1879,10 @@
         if (!state.highlanderLaunched) {
           state.highlanderLaunched = true;
           var nav = document.querySelector('[data-nav="highlander"]');
-          nav.disabled = false;
-          nav.classList.remove("locked");
+          if (nav) {
+            nav.disabled = false;
+            nav.classList.remove("locked");
+          }
           showToast(BOOT.mode === "http"
             ? "Client-side advisory comparison opened from " + state.packetSnapshot + "; server Highlander consumer remains NOT WIRED."
             : "One idempotent mock Highlander job created from " + state.packetSnapshot + ".");
@@ -1938,13 +1938,18 @@
           button.addEventListener("click", function () { switchScreen(button.dataset.nav); });
         });
 
-        document.querySelectorAll("[data-metric-stage]").forEach(function (select) {
-          select.addEventListener("change", function () {
+        document.querySelectorAll(".metric-button").forEach(function (button) {
+          button.addEventListener("click", function () {
+            var stage = button.dataset.metricStage;
+            var value = button.dataset.metricValue;
             var priorX = new Map(state.nodes.map(function (node) { return [node.id, node.x]; }));
-            state.metrics[select.dataset.metricStage] = select.value;
+            state.metrics[stage] = value;
+            document.querySelectorAll('[data-metric-stage="' + stage + '"]').forEach(function (candidate) {
+              candidate.setAttribute("aria-pressed", candidate === button ? "true" : "false");
+            });
             renderGraph();
             var xStable = state.nodes.every(function (node) { return priorX.get(node.id) === node.x; });
-            announce(METRICS[select.dataset.metricStage][select.value].label + " selected. Presentation changed; stored records and x lanes " + (xStable ? "remain unchanged." : "changed unexpectedly."));
+            announce(METRICS[stage][value].label + " selected. Presentation changed; stored records and x lanes " + (xStable ? "remain unchanged." : "changed unexpectedly."));
           });
         });
 
@@ -2019,21 +2024,18 @@
       }
 
       function applyBootMode() {
-        var indicator = document.getElementById("backend-indicator");
-        indicator.textContent = BOOT.mode === "http" ? "backend: http · " + BOOT.base : "backend: mock (in-page demo)";
         if (BOOT.mode !== "http") return;
 
-        // Local judging mode: replace mock-only copy immediately, then let the
-        // backend replace the truth strip with its authoritative /api/meta labels.
-        var strip = document.querySelector("[data-truth-strip]");
-        strip.innerHTML = '<span class="truth-chip">PROPOSED TARGET</span><span class="truth-chip">LOCAL HTTP BACKEND</span><span class="truth-chip unwired">HIGHLANDER CLIENT-SIDE · SERVER CONSUMER NOT WIRED</span>';
         var setupModeChip = document.getElementById("setup-mode-chip");
         setupModeChip.textContent = "Local orchestrated run";
         setupModeChip.classList.remove("mock");
-        document.getElementById("run-mode-description").textContent = "Run creates an immutable setup snapshot, executes the orchestrated five-stage judging flow, and polls the same local process for updates.";
         elements.runButton.textContent = "Run local exploration →";
         document.querySelector('.rail-band[data-stage="simulation"] h2').textContent = "Target tractability";
-        document.getElementById("metric-simulation").innerHTML = '<option value="support">Tractability dossier · no scalar</option>';
+        METRICS.simulation.support.label = "Tractability dossier";
+        document.querySelectorAll('[data-metric-stage="simulation"]').forEach(function (button) {
+          if (button.dataset.metricValue === "support") button.textContent = "Tractability dossier · no scalar";
+          else button.hidden = true;
+        });
         document.getElementById("simulation-axis-source").innerHTML = "native packet<br>no scalar imputed";
         document.getElementById("gap-confirm-copy").textContent = "I acknowledge terminal packet gaps, cached outputs, and labeled fallbacks. Continue to the advisory client-side comparison.";
         document.getElementById("restart-demo").textContent = "Refresh snapshot now";
@@ -2055,16 +2057,6 @@
           "<tr><td>Recruitability</td><td>clinical_simulation</td><td>A failed live attempt and schema-valid DEMO_FALLBACK remain separate truths.</td></tr>" +
           "<tr><td>Tractability</td><td>simulation</td><td>Validated cached output is inspectable; no scalar atomistic score is imputed.</td></tr>" +
           "<tr><td>Highlander</td><td>hypothesis-highlander</td><td>CLIENT-SIDE COMPARISON · SERVER CONSUMER NOT WIRED.</td></tr>";
-        BOOT.http.fetchMeta().then(function (meta) {
-          if (!meta || !Array.isArray(meta.truth_labels) || !meta.truth_labels.length) return;
-          strip.innerHTML = "";
-          meta.truth_labels.forEach(function (label) {
-            var chip = document.createElement("span");
-            chip.className = "truth-chip";
-            chip.textContent = label;
-            strip.appendChild(chip);
-          });
-        });
       }
 
       function initialize() {
