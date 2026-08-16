@@ -1462,7 +1462,7 @@
             slot: index,
             id: "bio-slot-" + index,
             label: focus.display_label || focus.name || focus.thing_id || branch.branch_id,
-            summary: (focus.kind === "process" ? "Mechanistic/PD readout focus" : "Biomarker focus") + " selected from live evidence; " + (focus.support_count || 0) + " supporting finding(s).",
+            summary: (focus.kind === "process" ? "Mechanistic/PD readout focus" : "Biomarker focus") + " selected from producer evidence; " + (focus.support_count || 0) + " supporting finding(s).",
             metrics: { exploration: null, evidence: null, pursuit: null },
             nativeMetrics: { exploration: null, evidence: null, pursuit: null },
             uncertainty: "Focus selection preserves mapper finding and link IDs; no display score is imputed.",

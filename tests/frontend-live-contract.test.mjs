@@ -558,6 +558,29 @@ test("scientific snapshot binds three exact focus branches and native artifacts"
   assert.equal(hooks.state.runData.programs[0].scientificNodes.roi_calculator.output_hash, "sha256:output-roi-b1");
 });
 
+test("scientific focus copy stays mode-neutral while explicit LIVE origins remain visible", () => {
+  const replay = ingestScientificSnapshot();
+  const processFocus = replay.hooks.state.runData.biomarkers[2];
+
+  assert.equal(replay.hooks.state.executionMode, "REPLAY");
+  assert.match(processFocus.summary, /selected from producer evidence/);
+  assert.doesNotMatch(processFocus.summary, /selected from live evidence/i);
+  assert.equal(replay.hooks.findNode("hyp-slot-2").outputOrigin, "DETERMINISTIC_REPLAY");
+
+  const liveSnapshot = structuredClone(scientificSnapshot);
+  liveSnapshot.execution_mode = "LIVE";
+  liveSnapshot.branches[2].nodes.hypothesis_generator.output_origin = "LIVE";
+  const live = ingestScientificSnapshot(liveSnapshot);
+  live.hooks.renderInspector(live.hooks.findNode("hyp-slot-2"));
+
+  assert.equal(live.hooks.state.executionMode, "LIVE");
+  assert.match(live.hooks.state.runData.biomarkers[2].summary, /selected from producer evidence/);
+  assert.match(
+    live.hooks.elements.inspectorBody.innerHTML,
+    /<span>Output origin<\/span><strong>LIVE<\/strong>/,
+  );
+});
+
 test("scientific inspector shows exact hashes, native simulated names, and terminal reasons", () => {
   const { hooks } = ingestScientificSnapshot();
 
