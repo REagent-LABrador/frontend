@@ -835,7 +835,10 @@
       overflow: hidden;
     }
 
-    .inspector.visible { display: grid; grid-template-rows: auto 1fr; }
+    /* The column track must be explicit. An implicit auto track sizes to max-content, so a
+       nowrap title (hypothesis stages onward carry long composite names) widens the grid past
+       the fixed panel width and overflow: hidden clips the status grid's second column. */
+    .inspector.visible { display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr); }
     .inspector.collapsed { width: var(--inspector-collapsed); }
     .inspector.collapsed .inspector-head { height: 100%; padding: 10px 5px; flex-direction: column; justify-content: flex-start; }
     .inspector.collapsed .inspector-title, .inspector.collapsed .inspector-body, .inspector.collapsed .close-inspector { display: none; }
@@ -847,6 +850,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 10px;
+      min-width: 0;
       padding: 13px 14px;
       color: #f5f2e7;
       background: var(--dark);
@@ -859,7 +863,7 @@
     .icon-button { width: 29px; height: 29px; padding: 0; color: #edf2ef; background: #2e4239; border: 1px solid #53665e; border-radius: 7px; font-weight: 950; }
     .collapsed-identity { display: none; color: #cbd7d1; }
 
-    .inspector-body { overflow: auto; padding: 14px; }
+    .inspector-body { min-width: 0; overflow: auto; padding: 14px; }
 
     .state-warning {
       margin-bottom: 10px;
