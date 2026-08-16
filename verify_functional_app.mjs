@@ -238,6 +238,11 @@ assert.ok(progressStateRule, "progress stage state must expose a stable text rul
 assert.match(progressStateRule[1], /display:\s*block/);
 assert.match(progressStateRule[1], /overflow-wrap:\s*anywhere/);
 assert.doesNotMatch(progressStateRule[1], /white-space:\s*nowrap|text-overflow:\s*ellipsis/);
+assert.match(
+  styles,
+  /\.progress-step\[data-state="replay"\]\s*\{[^}]*background:\s*var\(--green-soft\)[^}]*box-shadow:\s*inset 4px 0 0 var\(--amber\)/s,
+  "cached replay stages must stay green while retaining a distinct provenance edge",
+);
 
 const inspectorTitleRule = styles.match(/\.inspector-title h2\s*\{([^}]*)\}/s);
 assert.ok(inspectorTitleRule, "long inspector titles must have an explicit wrap rule");

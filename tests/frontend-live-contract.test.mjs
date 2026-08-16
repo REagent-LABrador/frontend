@@ -204,6 +204,8 @@ test("machine reason codes stay in audit detail instead of primary node copy", (
   harness.hooks.ingestSnapshot(snapshot);
 
   const simulation = harness.hooks.findNode("simulation-slot-0");
+  assert.equal(harness.hooks.state.stageStates[4], "replay");
+  assert.equal(harness.hooks.state.stageNotes[4], "Complete · cached replay");
   assert.equal(simulation.reason, "PINNED_ARTIFACT_REVALIDATED");
   assert.equal(typeof harness.hooks.publicReasonSummary, "function");
   assert.doesNotMatch(

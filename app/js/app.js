@@ -714,7 +714,7 @@
 
       function stageTerminal(index) {
         var stageState = state.stageStates[index];
-        return stageState === "complete" || stageState === "warning" || stageState === "failed";
+        return stageState === "complete" || stageState === "replay" || stageState === "warning" || stageState === "failed";
       }
 
       function retireUnusedCapacity() {
@@ -1803,6 +1803,12 @@
       function conciseStageNote(stage, status) {
         if (status === "RUNNING") return "Running";
         if (status === "FAILED") return "Terminal · gaps";
+        if (
+          status === "COMPLETE_WITH_WARNINGS" &&
+          stage &&
+          stage.output_origin === "CACHED" &&
+          stage.reason_code === "PINNED_ARTIFACT_REVALIDATED"
+        ) return "Complete · cached replay";
         if (status === "COMPLETE_WITH_WARNINGS") return "Complete · warnings";
         if (status === "COMPLETE") {
           var origin = stage && typeof stage.output_origin === "string" ? stage.output_origin : "";
@@ -1844,10 +1850,14 @@
           if (index === -1) return;
           var truth = normalizeStageTruth(stage, { execution: "QUEUED" });
           var status = truth.presentationStatus;
+          var cachedReplay =
+            status === "COMPLETE_WITH_WARNINGS" &&
+            stage.output_origin === "CACHED" &&
+            stage.reason_code === "PINNED_ARTIFACT_REVALIDATED";
           state.stageStates[index] =
             status === "RUNNING" ? "running" :
             status === "COMPLETE" ? "complete" :
-            status === "COMPLETE_WITH_WARNINGS" ? "warning" :
+            status === "COMPLETE_WITH_WARNINGS" ? (cachedReplay ? "replay" : "warning") :
             status === "FAILED" ? "failed" : "queued";
           state.stageNotes[index] = conciseStageNote(stage, status);
           if (status === "RUNNING") markStagePending(mappedStageId);

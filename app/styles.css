@@ -577,6 +577,7 @@
     .progress-step .stage-state { display: block; margin-top: 2px; color: #646c66; font-size: 9px; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
     .progress-step[data-state="running"] { background: var(--blue-soft); border-color: #7cb0bb; }
     .progress-step[data-state="complete"] { background: var(--green-soft); border-color: #88caa1; }
+    .progress-step[data-state="replay"] { background: var(--green-soft); border-color: #88caa1; box-shadow: inset 4px 0 0 var(--amber); }
     .progress-step[data-state="warning"] { background: var(--amber-soft); border-color: #d8aa58; }
     .progress-step[data-state="failed"] { background: var(--red-soft); border-color: #cf8d84; }
 
