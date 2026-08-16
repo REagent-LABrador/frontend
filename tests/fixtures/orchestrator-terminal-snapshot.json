@@ -1,0 +1,315 @@
+{
+  "run_id": "LR-TEST-TRUTH",
+  "updated_at": "2026-08-16T12:00:00Z",
+  "last_event_id": 17,
+  "stages": [
+    {
+      "stage_id": "biomarker",
+      "result_status": "COMPLETE_WITH_WARNINGS",
+      "execution_status": "SKIPPED",
+      "output_origin": "CACHED",
+      "result_basis": ["OBSERVED", "INFERRED"],
+      "runtime_maturity": "UNVERIFIED",
+      "reason_code": "MODULE_CONFIGURED_CACHED",
+      "qualifiers": ["CACHED_EVIDENCE_INPUT", "TRUNCATED_SEARCH"],
+      "warnings": ["Pinned evidence artifact; the mapper was not invoked."],
+      "note": "validated pinned artifact used; live module not invoked",
+      "requested": 1,
+      "returned": 1
+    },
+    {
+      "stage_id": "hypothesis",
+      "result_status": "COMPLETE",
+      "execution_status": "COMPLETE",
+      "output_origin": "LIVE",
+      "result_basis": ["INFERRED"],
+      "runtime_maturity": "LOCAL",
+      "reason_code": null,
+      "qualifiers": ["DETERMINISTIC_DRY_RUN"],
+      "warnings": [],
+      "note": "live module output validated",
+      "requested": 1,
+      "returned": 1
+    },
+    {
+      "stage_id": "roi",
+      "result_status": "COMPLETE",
+      "execution_status": "COMPLETE",
+      "output_origin": "LIVE",
+      "result_basis": ["MODELED"],
+      "runtime_maturity": "LOCAL",
+      "reason_code": null,
+      "qualifiers": ["SYNTHETIC", "NOT_DECISION_GRADE"],
+      "warnings": ["Result is not decision-grade."],
+      "note": "live module output validated",
+      "requested": 1,
+      "returned": 1
+    },
+    {
+      "stage_id": "recruitability",
+      "result_status": "COMPLETE_WITH_WARNINGS",
+      "execution_status": "FAILED",
+      "output_origin": "DEMO_FALLBACK",
+      "result_basis": ["MODELED"],
+      "runtime_maturity": "UNVERIFIED",
+      "reason_code": "RUNTIME_UNAVAILABLE",
+      "qualifiers": ["SIMULATED", "NOT_PROBABILITY_OF_APPROVAL"],
+      "warnings": ["Live execution could not start because Bun was unavailable."],
+      "note": "runtime unavailable; validated fallback used",
+      "requested": 1,
+      "returned": 1
+    },
+    {
+      "stage_id": "simulation",
+      "result_status": "COMPLETE_WITH_WARNINGS",
+      "execution_status": "SKIPPED",
+      "output_origin": "CACHED",
+      "result_basis": ["OBSERVED", "MODELED"],
+      "runtime_maturity": "UNVERIFIED",
+      "reason_code": "MODULE_CONFIGURED_CACHED",
+      "qualifiers": ["CACHED_DOSSIER", "TRACTABILITY_NOT_ATOMISTIC"],
+      "warnings": ["This is a tractability dossier, not atomistic simulation."],
+      "note": "validated pinned tractability dossier used",
+      "requested": 1,
+      "returned": 1
+    }
+  ],
+  "biomarkers": [
+    {
+      "slot": 0,
+      "label": "IRAK4",
+      "summary": "IRAK4 inhibition in rheumatoid arthritis",
+      "metrics": {
+        "exploration": 5.5,
+        "evidence": 51.2,
+        "pursuit": null
+      },
+      "uncertainty": "Search coverage was truncated."
+    }
+  ],
+  "programs": [
+    {
+      "id": "IRAK4-RA-DEMO",
+      "lane": 0,
+      "biomarker_slot": 0,
+      "hypothesis_slot": 0,
+      "label": "IRAK4 inhibition suppresses inflammatory signalling",
+      "short_label": "IRAK4 · Rheumatoid arthritis",
+      "metrics": {
+        "boldness": 5.5,
+        "evidence": 51.2,
+        "plausibility": 47,
+        "rnpv": -24,
+        "positive": 0,
+        "impact": null,
+        "recruit": 0,
+        "duration": 455,
+        "screens": 5,
+        "risk": 100,
+        "support": null,
+        "occupancy": null,
+        "convergence": null
+      },
+      "uncertainty": "rNPV P10–P90: -$142.7M to -$7.9M · NOT_DECISION_GRADE",
+      "public_why": "A qualified integrated candidate with explicit stage provenance.",
+      "roi_failed": false,
+      "recruit_failed": false,
+      "overflow_rnpv": false,
+      "not_amenable": false,
+      "revision": "packet-r17",
+      "hash": "sha256:test-packet",
+      "station_payloads": {
+        "biomarker": {
+          "graph_id": "graph-test",
+          "interpretability": {
+            "schema_version": "1.0.0",
+            "headline": {
+              "title": "Evidence coverage",
+              "result": "qualified_support",
+              "plain_language": "Evidence supports the mechanism with material coverage gaps.",
+              "status": "QUALIFIED",
+              "basis": ["OBSERVED", "INFERRED"]
+            },
+            "metrics": [],
+            "steps": [],
+            "evidence": [],
+            "assumptions": [],
+            "uncertainty": {
+              "method": "coverage assessment",
+              "intervals": [],
+              "seed": null,
+              "draws": null,
+              "limitations": ["Search was truncated."]
+            },
+            "limitations": [
+              {
+                "code": "TRUNCATED_SEARCH",
+                "severity": "WARNING",
+                "message": "The configured search cap was reached.",
+                "field_path": "coverage.truncated"
+              }
+            ],
+            "counterfactuals": [],
+            "lineage": [],
+            "extensions": {}
+          }
+        },
+        "hypothesis": {
+          "hypothesis": {"id": "hyp-test"}
+        },
+        "roi": {
+          "interpretability": {
+            "schema_version": "1.0.0",
+            "headline": {
+              "title": "Risk-adjusted value",
+              "result": "negative_rnpv",
+              "plain_language": "The modeled program has negative risk-adjusted value.",
+              "status": "QUALIFIED",
+              "basis": ["MODELED", "SYNTHETIC"]
+            },
+            "metrics": [],
+            "steps": [],
+            "evidence": [],
+            "assumptions": [],
+            "uncertainty": {
+              "method": "Monte Carlo",
+              "intervals": [],
+              "seed": 42,
+              "draws": 1000,
+              "limitations": []
+            },
+            "limitations": [],
+            "counterfactuals": [],
+            "lineage": [],
+            "extensions": {}
+          }
+        },
+        "recruitability": {
+          "score": 0,
+          "simulated_months_to_enroll": 455,
+          "simulated_months_range": [93, 1172],
+          "screens_per_enrollee": 5,
+          "interpretability": {
+            "schema_version": "1.0.0",
+            "headline": {
+              "title": "Enrollment feasibility",
+              "result": "infeasible_trial_design",
+              "plain_language": "The current trial design is not operationally feasible.",
+              "status": "INCONCLUSIVE",
+              "basis": ["MODELED"]
+            },
+            "metrics": [],
+            "steps": [],
+            "evidence": [],
+            "assumptions": [],
+            "uncertainty": {
+              "method": "scenario range",
+              "intervals": [],
+              "seed": null,
+              "draws": null,
+              "limitations": ["This range is not an IQR."]
+            },
+            "limitations": [],
+            "counterfactuals": [],
+            "lineage": [],
+            "extensions": {}
+          }
+        },
+        "simulation": {
+          "verdict": "small_molecule_tractable",
+          "verdict_basis": "retrieved_precedent",
+          "interpretability": {
+            "schema_version": "1.0.0",
+            "headline": {
+              "title": "IRAK4 tractability dossier",
+              "result": "small_molecule_tractable",
+              "plain_language": "Retrieved precedent supports small-molecule tractability; this is not atomistic simulation.",
+              "status": "QUALIFIED",
+              "basis": ["OBSERVED", "MODELED"]
+            },
+            "metrics": [
+              {
+                "id": "metric.pocket_volume",
+                "label": "Pocket volume",
+                "value": 682.5,
+                "unit": "angstrom^3",
+                "display": "682.5 Å³",
+                "meaning": "Absolute physical pocket volume without a classification threshold.",
+                "direction": "unknown",
+                "evidence_ids": ["evidence.structure"],
+                "assumption_ids": ["assumption.site_selection"]
+              }
+            ],
+            "steps": [
+              {
+                "id": "step.site_scan",
+                "label": "Site scan",
+                "method": "fpocket",
+                "formula": null,
+                "inputs": [],
+                "result": {"value": 682.5, "unit": "angstrom^3"},
+                "evidence_ids": ["evidence.structure"],
+                "assumption_ids": ["assumption.site_selection"]
+              }
+            ],
+            "evidence": [
+              {
+                "id": "evidence.structure",
+                "claim": "The ATP site is present in the selected structure.",
+                "source_type": "structure_database",
+                "source_id": "PDB:6EGE",
+                "source_url": "https://www.rcsb.org/structure/6EGE",
+                "locator": "chain A",
+                "quote": null,
+                "grade": "HIGH",
+                "synthetic": false
+              }
+            ],
+            "assumptions": [
+              {
+                "id": "assumption.site_selection",
+                "path": "tractability.site_hypothesis_basis",
+                "value": "6EGE:DL1",
+                "unit": "identifier",
+                "basis": "Ligand-anchored ATP site",
+                "synthetic": false
+              }
+            ],
+            "uncertainty": {
+              "method": "parameter sweep",
+              "intervals": [],
+              "seed": null,
+              "draws": null,
+              "limitations": ["Druggability score is within-structure only."]
+            },
+            "limitations": [
+              {
+                "code": "NOT_ATOMISTIC_SIMULATION",
+                "severity": "WARNING",
+                "message": "This dossier is not an atomistic trajectory.",
+                "field_path": "verdict"
+              }
+            ],
+            "counterfactuals": [
+              {
+                "change": "Remove retrieved precedent",
+                "result": "computed evidence only",
+                "meaning": "The verdict would require qualification."
+              }
+            ],
+            "lineage": [
+              {
+                "output_path": "verdict",
+                "input_paths": ["precedent", "tractability"],
+                "transformation": "Rule-based synthesis preserving separate axes"
+              }
+            ],
+            "extensions": {}
+          }
+        }
+      }
+    }
+  ],
+  "highlander_ready": false,
+  "highlander_blocked_reason": "candidate packet requires review"
+}
