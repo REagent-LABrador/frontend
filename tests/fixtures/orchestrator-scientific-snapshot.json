@@ -1,0 +1,297 @@
+{
+  "schema_version": "labrador.scientific-snapshot.v1",
+  "run_id": "LR-SCIENTIFIC-TEST",
+  "run_status": "COMPLETED_WITH_WARNINGS",
+  "updated_at": "2026-08-16T18:00:00Z",
+  "last_event_id": 42,
+  "execution_mode": "REPLAY",
+  "presentation_mode": "SCIENTIFIC",
+  "representative_demo": false,
+  "watermark": null,
+  "scientific_packet_excludes_representative_values": true,
+  "stages": [
+    {
+      "stage_id": "evidence_mapper",
+      "result_status": "COMPLETE",
+      "execution_status": "COMPLETE",
+      "module_execution_status": "COMPLETE",
+      "output_origin": "DETERMINISTIC_REPLAY",
+      "result_basis": ["OBSERVED"],
+      "runtime_maturity": "LOCAL",
+      "reason_code": null,
+      "qualifiers": [],
+      "warnings": [],
+      "note": "one evidence graph complete"
+    },
+    {
+      "stage_id": "hypothesis_generator",
+      "result_status": "COMPLETE_WITH_WARNINGS",
+      "execution_status": "COMPLETE_WITH_WARNINGS",
+      "module_execution_status": "COMPLETE",
+      "output_origin": "MIXED",
+      "result_basis": ["INFERRED"],
+      "runtime_maturity": "LOCAL",
+      "reason_code": null,
+      "qualifiers": [],
+      "warnings": ["1 branch node returned CANNOT_COMPLETE."],
+      "note": "2 branch nodes complete; 1 cannot complete"
+    },
+    {
+      "stage_id": "clinical_simulation",
+      "result_status": "COMPLETE_WITH_WARNINGS",
+      "execution_status": "COMPLETE_WITH_WARNINGS",
+      "module_execution_status": "COMPLETE",
+      "output_origin": "MIXED",
+      "result_basis": ["MODELED"],
+      "runtime_maturity": "LOCAL",
+      "reason_code": null,
+      "qualifiers": [],
+      "warnings": ["1 branch node returned CANNOT_COMPLETE."],
+      "note": "2 branch nodes complete; 1 cannot complete"
+    },
+    {
+      "stage_id": "roi_calculator",
+      "result_status": "COMPLETE_WITH_WARNINGS",
+      "execution_status": "COMPLETE_WITH_WARNINGS",
+      "module_execution_status": "COMPLETE",
+      "output_origin": "MIXED",
+      "result_basis": ["MODELED"],
+      "runtime_maturity": "LOCAL",
+      "reason_code": null,
+      "qualifiers": [],
+      "warnings": ["1 branch node returned CANNOT_COMPLETE."],
+      "note": "2 branch nodes complete; 1 cannot complete"
+    },
+    {
+      "stage_id": "simulation",
+      "result_status": "COMPLETE",
+      "execution_status": "COMPLETE",
+      "module_execution_status": "COMPLETE",
+      "output_origin": "DETERMINISTIC_REPLAY",
+      "result_basis": ["OBSERVED", "MODELED"],
+      "runtime_maturity": "LOCAL",
+      "reason_code": null,
+      "qualifiers": [],
+      "warnings": [],
+      "note": "3 branch nodes complete"
+    }
+  ],
+  "branches": [
+    {
+      "branch_id": "BR-01-b1",
+      "status": "COMPLETE",
+      "focus": {
+        "thing_id": "b1",
+        "name": "Marker one",
+        "kind": "biomarker",
+        "display_label": "Marker one",
+        "finding_ids": ["f1"],
+        "link_ids": ["l1"],
+        "support_count": 2,
+        "evidence_count": 2,
+        "mentions": 3
+      },
+      "nodes": {
+        "hypothesis_generator": {
+          "module_id": "hypothesis_generator",
+          "status": "COMPLETE",
+          "reason_code": null,
+          "message": null,
+          "output_origin": "DETERMINISTIC_REPLAY",
+          "input_ref": "branches/BR-01-b1/hypothesis_generator/input.json",
+          "input_hash": "sha256:input-hyp-b1",
+          "output_ref": "branches/BR-01-b1/hypothesis_generator/output.json",
+          "output_hash": "sha256:output-hyp-b1",
+          "duration_ms": 120,
+          "exit_code": 0,
+          "producer": {"repository": "REagent-LABrador/Hypothesis_Generator", "git_sha": "hyp-sha"},
+          "artifact": {
+            "status": "COMPLETE",
+            "hypothesis": {
+              "schema_version": "2.0",
+              "hypothesis": {
+                "id": "H-b1",
+                "scores": {"support": 0.8, "novelty": 0.6, "testability": 0.7},
+                "articulation": {
+                  "statement": "Marker one predicts reduced synovial inflammation",
+                  "mechanism": "IRAK4 inhibition changes the pathway",
+                  "novel_because": "The evidence links this marker to an under-tested response axis."
+                }
+              }
+            },
+            "cards": {
+              "hypotheses": [{"id": "H-b1", "scores": {"support": 0.8, "novelty": 0.6, "testability": 0.7}}],
+              "interpretability": {"schema_version": "1.0.0", "headline": {"title": "Focused hypothesis", "result": "H-b1", "plain_language": "One canonical branch hypothesis.", "status": "QUALIFIED", "basis": ["INFERRED"]}, "metrics": [], "steps": [], "evidence": [], "assumptions": [], "uncertainty": {"method": "producer score vector", "intervals": [], "limitations": []}, "limitations": [], "counterfactuals": [], "lineage": [], "extensions": {}}
+            }
+          }
+        },
+        "clinical_simulation": {
+          "module_id": "clinical_simulation",
+          "status": "COMPLETE",
+          "reason_code": null,
+          "message": null,
+          "output_origin": "DETERMINISTIC_REPLAY",
+          "input_ref": "branches/BR-01-b1/clinical_simulation/input.json",
+          "input_hash": "sha256:input-clin-b1",
+          "output_ref": "branches/BR-01-b1/clinical_simulation/output.json",
+          "output_hash": "sha256:output-clin-b1",
+          "duration_ms": 80,
+          "exit_code": 0,
+          "producer": {"repository": "REagent-LABrador/clinical_simulation", "git_sha": "clinical-sha"},
+          "artifact": {"status": "ok", "score": 0.72, "simulated_months_to_enroll": 22, "simulated_months_range": [18, 30], "screens_per_enrollee": 3, "why": "Enrollment remains feasible with timing risk."}
+        },
+        "simulation": {
+          "module_id": "simulation",
+          "status": "COMPLETE",
+          "reason_code": null,
+          "message": null,
+          "output_origin": "DETERMINISTIC_REPLAY",
+          "input_ref": "branches/BR-01-b1/simulation/input.json",
+          "input_hash": "sha256:input-sim-b1",
+          "output_ref": "branches/BR-01-b1/simulation/output.json",
+          "output_hash": "sha256:output-sim-b1",
+          "duration_ms": 90,
+          "exit_code": 0,
+          "producer": {"repository": "REagent-LABrador/simulation", "git_sha": "simulation-sha"},
+          "artifact": {"status": "ok", "verdict": "tractable", "verdict_basis": "retrieved_precedent", "target": {"uniprot_accession": "Q9NWZ3"}}
+        },
+        "roi_calculator": {
+          "module_id": "roi_calculator",
+          "status": "COMPLETE",
+          "reason_code": null,
+          "message": null,
+          "output_origin": "DETERMINISTIC_REPLAY",
+          "input_ref": "branches/BR-01-b1/roi_calculator/input.json",
+          "input_hash": "sha256:input-roi-b1",
+          "output_ref": "branches/BR-01-b1/roi_calculator/output.json",
+          "output_hash": "sha256:output-roi-b1",
+          "duration_ms": 70,
+          "exit_code": 0,
+          "producer": {"repository": "REagent-LABrador/rnpv-roi-calculator", "git_sha": "roi-sha"},
+          "artifact": {"status": "ok", "payload": {"summary": {"p10_rnpv": -10000000, "p50_rnpv": 45000000, "p90_rnpv": 110000000, "probability_positive_rnpv": 0.63}}}
+        }
+      }
+    },
+    {
+      "branch_id": "BR-02-b2",
+      "status": "CANNOT_COMPLETE",
+      "focus": {"thing_id": "b2", "name": "Marker two", "kind": "biomarker", "display_label": "Marker two", "finding_ids": ["f2"], "link_ids": ["l2"], "support_count": 1, "evidence_count": 1, "mentions": 1},
+      "nodes": {
+        "hypothesis_generator": {
+          "module_id": "hypothesis_generator",
+          "status": "CANNOT_COMPLETE",
+          "reason_code": "CREDENTIAL_MISSING",
+          "message": "ANTHROPIC_API_KEY is missing",
+          "output_origin": "NOT_RUN",
+          "input_ref": "branches/BR-02-b2/hypothesis_generator/input.json",
+          "input_hash": "sha256:input-hyp-b2",
+          "output_ref": "branches/BR-02-b2/hypothesis_generator/output.json",
+          "output_hash": "sha256:output-hyp-b2-failure",
+          "duration_ms": 1,
+          "exit_code": 2,
+          "producer": {"repository": "REagent-LABrador/Hypothesis_Generator", "git_sha": "hyp-sha"},
+          "artifact": {"status": "CANNOT_COMPLETE", "reason_code": "CREDENTIAL_MISSING", "message": "ANTHROPIC_API_KEY is missing"}
+        },
+        "clinical_simulation": {
+          "module_id": "clinical_simulation",
+          "status": "CANNOT_COMPLETE",
+          "reason_code": "UPSTREAM_FAILED",
+          "message": "required upstream node hypothesis_generator did not complete",
+          "output_origin": "NOT_RUN",
+          "input_ref": "branches/BR-02-b2/clinical_simulation/input.json",
+          "input_hash": "sha256:input-clin-b2",
+          "output_ref": "branches/BR-02-b2/clinical_simulation/output.json",
+          "output_hash": "sha256:output-clin-b2-failure",
+          "duration_ms": 0,
+          "exit_code": null,
+          "producer": {"repository": "REagent-LABrador/clinical_simulation", "git_sha": "clinical-sha"},
+          "artifact": {"status": "CANNOT_COMPLETE", "reason_code": "UPSTREAM_FAILED", "message": "required upstream node hypothesis_generator did not complete"}
+        },
+        "simulation": {
+          "module_id": "simulation",
+          "status": "COMPLETE",
+          "reason_code": null,
+          "message": null,
+          "output_origin": "DETERMINISTIC_REPLAY",
+          "input_ref": "branches/BR-02-b2/simulation/input.json",
+          "input_hash": "sha256:input-sim-b2",
+          "output_ref": "branches/BR-02-b2/simulation/output.json",
+          "output_hash": "sha256:output-sim-b2",
+          "duration_ms": 92,
+          "exit_code": 0,
+          "producer": {"repository": "REagent-LABrador/simulation", "git_sha": "simulation-sha"},
+          "artifact": {"status": "ok", "verdict": "tractable", "target": {"uniprot_accession": "Q9NWZ3"}}
+        },
+        "roi_calculator": {
+          "module_id": "roi_calculator",
+          "status": "CANNOT_COMPLETE",
+          "reason_code": "UPSTREAM_FAILED",
+          "message": "required upstream node hypothesis_generator did not complete",
+          "output_origin": "NOT_RUN",
+          "input_ref": "branches/BR-02-b2/roi_calculator/input.json",
+          "input_hash": "sha256:input-roi-b2",
+          "output_ref": "branches/BR-02-b2/roi_calculator/output.json",
+          "output_hash": "sha256:output-roi-b2-failure",
+          "duration_ms": 0,
+          "exit_code": null,
+          "producer": {"repository": "REagent-LABrador/rnpv-roi-calculator", "git_sha": "roi-sha"},
+          "artifact": {"status": "CANNOT_COMPLETE", "reason_code": "UPSTREAM_FAILED", "message": "required upstream node hypothesis_generator did not complete"}
+        }
+      }
+    },
+    {
+      "branch_id": "BR-03-p1",
+      "status": "COMPLETE",
+      "focus": {"thing_id": "p1", "name": "Pathway readout", "kind": "process", "display_label": "Mechanistic/PD readout: Pathway readout", "finding_ids": ["f1", "f2"], "link_ids": ["l1", "l2"], "support_count": 2, "evidence_count": 2, "mentions": 4},
+      "nodes": {
+        "hypothesis_generator": {
+          "module_id": "hypothesis_generator", "status": "COMPLETE", "reason_code": null, "message": null, "output_origin": "DETERMINISTIC_REPLAY", "input_ref": "branches/BR-03-p1/hypothesis_generator/input.json", "input_hash": "sha256:input-hyp-p1", "output_ref": "branches/BR-03-p1/hypothesis_generator/output.json", "output_hash": "sha256:output-hyp-p1", "duration_ms": 125, "exit_code": 0, "producer": {"repository": "REagent-LABrador/Hypothesis_Generator", "git_sha": "hyp-sha"},
+          "artifact": {"status": "COMPLETE", "hypothesis": {"schema_version": "2.0", "hypothesis": {"id": "H-p1", "scores": {"support": 0.7, "novelty": 0.8, "testability": 0.65}, "articulation": {"statement": "Pathway readout predicts pharmacodynamic response", "mechanism": "The readout tracks IRAK4 pathway suppression", "novel_because": "It is a supported mechanistic readout rather than a fallback biomarker."}}}, "cards": {"hypotheses": [{"id": "H-p1", "scores": {"support": 0.7, "novelty": 0.8, "testability": 0.65}}]}}
+        },
+        "clinical_simulation": {
+          "module_id": "clinical_simulation", "status": "COMPLETE", "reason_code": null, "message": null, "output_origin": "DETERMINISTIC_REPLAY", "input_ref": "branches/BR-03-p1/clinical_simulation/input.json", "input_hash": "sha256:input-clin-p1", "output_ref": "branches/BR-03-p1/clinical_simulation/output.json", "output_hash": "sha256:output-clin-p1", "duration_ms": 82, "exit_code": 0, "producer": {"repository": "REagent-LABrador/clinical_simulation", "git_sha": "clinical-sha"},
+          "artifact": {"status": "ok", "score": 0.81, "simulated_months_to_enroll": 19, "simulated_months_range": [16, 26], "screens_per_enrollee": 2.5, "why": "The readout is compatible with the proposed enrollment frame."}
+        },
+        "simulation": {
+          "module_id": "simulation", "status": "COMPLETE", "reason_code": null, "message": null, "output_origin": "DETERMINISTIC_REPLAY", "input_ref": "branches/BR-03-p1/simulation/input.json", "input_hash": "sha256:input-sim-p1", "output_ref": "branches/BR-03-p1/simulation/output.json", "output_hash": "sha256:output-sim-p1", "duration_ms": 95, "exit_code": 0, "producer": {"repository": "REagent-LABrador/simulation", "git_sha": "simulation-sha"},
+          "artifact": {"status": "ok", "verdict": "tractable", "verdict_basis": "both", "target": {"uniprot_accession": "Q9NWZ3"}, "next_experiment": {"description": "Measure target engagement in synovial tissue."}}
+        },
+        "roi_calculator": {
+          "module_id": "roi_calculator", "status": "COMPLETE", "reason_code": null, "message": null, "output_origin": "DETERMINISTIC_REPLAY", "input_ref": "branches/BR-03-p1/roi_calculator/input.json", "input_hash": "sha256:input-roi-p1", "output_ref": "branches/BR-03-p1/roi_calculator/output.json", "output_hash": "sha256:output-roi-p1", "duration_ms": 72, "exit_code": 0, "producer": {"repository": "REagent-LABrador/rnpv-roi-calculator", "git_sha": "roi-sha"},
+          "artifact": {"status": "ok", "payload": {"summary": {"p10_rnpv": -5000000, "p50_rnpv": 30000000, "p90_rnpv": 90000000, "probability_positive_rnpv": 0.71}}}
+        }
+      }
+    }
+  ],
+  "highlander_ready": true,
+  "highlander": {
+    "launched": true,
+    "job_id": "HL-SCIENTIFIC-TEST",
+    "packet_snapshot": {"id": "PKT-SCIENTIFIC-TEST-R42"},
+    "result_hash": "sha256:highlander-result-test",
+    "result": {
+      "schemaVersion": "highlander.packet-comparison-result.v1",
+      "objectivePolicyId": "program-frontier.v1",
+      "snapshotId": "HL-SNAPSHOT-TEST",
+      "createdAt": "2026-08-16T18:00:01Z",
+      "runId": "LR-SCIENTIFIC-TEST",
+      "objectivePolicy": {"policyId": "program-frontier.v1", "objectives": [{"objectiveId": "hypothesis.support", "direction": "MAXIMIZE"}, {"objectiveId": "hypothesis.novelty", "direction": "MAXIMIZE"}]},
+      "candidates": [
+        {"candidateId": "H-b1", "packetRevisionId": "packet-b1", "packetHash": "sha256:packet-b1", "comparisonStatus": "FRONTIER", "observations": [{"objectiveId": "hypothesis.support", "rawValue": 0.8, "direction": "MAXIMIZE", "unit": "fraction", "evidenceBasis": "INFERRED"}, {"objectiveId": "hypothesis.novelty", "rawValue": 0.6, "direction": "MAXIMIZE", "unit": "fraction", "evidenceBasis": "INFERRED"}], "qualifiers": ["NOMINAL_PARETO"]},
+        {"candidateId": "BR-02-b2", "packetRevisionId": "packet-b2", "packetHash": "sha256:packet-b2", "comparisonStatus": "INCOMPARABLE", "observations": [], "qualifiers": ["INCOMPLETE_BRANCH"], "incomparableReasons": ["HYPOTHESIS_GENERATOR:CREDENTIAL_MISSING"]},
+        {"candidateId": "H-p1", "packetRevisionId": "packet-p1", "packetHash": "sha256:packet-p1", "comparisonStatus": "FRONTIER", "observations": [{"objectiveId": "hypothesis.support", "rawValue": 0.7, "direction": "MAXIMIZE", "unit": "fraction", "evidenceBasis": "INFERRED"}, {"objectiveId": "hypothesis.novelty", "rawValue": 0.8, "direction": "MAXIMIZE", "unit": "fraction", "evidenceBasis": "INFERRED"}], "qualifiers": ["NOMINAL_PARETO"]}
+      ],
+      "comparisonGroups": [],
+      "frontier": ["H-b1", "H-p1"],
+      "dominated": [],
+      "incomparable": [{"candidateId": "BR-02-b2", "reasons": ["HYPOTHESIS_GENERATOR:CREDENTIAL_MISSING"]}],
+      "dominanceRelationships": [],
+      "equivalenceGroups": [],
+      "qualifiers": ["NO_GLOBAL_WINNER", "NOMINAL_PARETO"],
+      "nextEvidenceAction": {"actionId": "action-test", "actionType": "run_follow_up", "target": "Q9NWZ3", "description": "Measure target engagement in synovial tissue.", "producerModuleId": "small-molecule-tractability-review", "producerOutputSha256": "sha256:output-sim-p1", "sourceId": "next_experiment", "sourcePath": "$.next_experiment", "candidateIds": ["H-p1"], "candidateCount": 1, "selectionBasis": "PRODUCER_EMITTED_MOST_BRANCHES_STABLE_TIEBREAK"}
+    }
+  },
+  "modules": [],
+  "warnings": [],
+  "errors": [{"code": "CREDENTIAL_MISSING", "module": "hypothesis_generator", "branch": "BR-02-b2", "message": "ANTHROPIC_API_KEY is missing"}]
+}

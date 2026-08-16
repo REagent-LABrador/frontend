@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+  <div id="representative-watermark" class="representative-watermark" role="status" hidden></div>
   <main>
     <section id="screen-setup" class="screen setup-screen active" data-screen="setup" aria-labelledby="setup-title">
       <div class="setup-layout">
@@ -274,11 +275,13 @@
         </div>
 
         <div class="region-stack middle-stack">
+          <section id="server-highlander-result" class="card server-highlander-result" data-region="server-highlander-result" hidden></section>
+
           <section class="card" data-region="program-comparison" data-highlander-section="comparison" aria-labelledby="comparison-title">
             <div class="card-head"><div><h2 id="comparison-title">Raw objective comparison</h2><p>Original units, uncertainty, qualifiers, and three-axis frontier membership. No global winner.</p></div><span id="comparison-mode-badge" class="badge proxy">illustrative</span></div>
             <div class="comparison-wrap"><table class="comparison-table"><thead><tr><th>Program</th><th>P50 rNPV</th><th>Positive rNPV</th><th>Recruitability</th><th>Enroll</th><th>Plausibility</th><th>Simulation / tractability</th><th>Baseline status</th></tr></thead><tbody id="comparison-body"></tbody></table></div>
             <figure class="pareto-figure">
-              <figcaption><strong>Three-dimensional Pareto view:</strong> P50 rNPV × recruitability × simulation / tractability. Each numbered point is one plan. Plans with identical vectors fan slightly around their shared coordinate. <span class="pareto-frontier-key">Nominal frontier projection</span> The line is a projected guide through complete non-dominated records, not a frontier surface or decision threshold. Missing values remain on a separate shelf. The current RA demo uses a labeled representative tractability fit on the Z axis; its native cached dossier remains shared across plans.</figcaption>
+              <figcaption id="pareto-caption"><strong>Three-dimensional Pareto view:</strong> P50 rNPV × recruitability × simulation / tractability. Each numbered point is one plan. Plans with identical vectors fan slightly around their shared coordinate. <span class="pareto-frontier-key">Nominal frontier projection</span> The line is a projected guide through complete non-dominated records, not a frontier surface or decision threshold. Missing values remain on a separate shelf. The current RA demo uses a labeled representative tractability fit on the Z axis; its native cached dossier remains shared across plans.</figcaption>
               <svg id="pareto-plot" class="pareto-plot" data-pareto-frontier="nominal-projection" data-pareto-dimensions="roi,recruitability,simulation" viewBox="0 0 700 250" role="img" aria-label="Three-dimensional plan map for ROI, recruitability, and simulation or tractability with a nominal Pareto frontier projection"><polyline id="nominal-pareto-frontier" class="pareto-frontier-line" data-pareto-frontier-line="nominal-projection" points="" role="img" aria-label="Nominal Pareto frontier projection"></polyline></svg>
             </figure>
           </section>

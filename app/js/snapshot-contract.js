@@ -78,3 +78,104 @@ export function interpretabilityView(payload) {
     stepCount: Array.isArray(raw.steps) ? raw.steps.length : 0,
   };
 }
+
+const SCIENTIFIC_STAGE_BY_MODULE = Object.freeze({
+  evidence_mapper: "biomarker",
+  hypothesis_generator: "hypothesis",
+  roi_calculator: "roi",
+  clinical_simulation: "recruitability",
+  simulation: "simulation",
+});
+
+const SCIENTIFIC_MODULE_BY_STAGE = Object.freeze(
+  Object.fromEntries(
+    Object.entries(SCIENTIFIC_STAGE_BY_MODULE).map(([moduleId, stageId]) => [
+      stageId,
+      moduleId,
+    ]),
+  ),
+);
+
+export function isScientificSnapshot(snapshot) {
+  return Boolean(
+    snapshot &&
+      typeof snapshot === "object" &&
+      snapshot.schema_version === "labrador.scientific-snapshot.v1",
+  );
+}
+
+export function scientificStageId(moduleId) {
+  return SCIENTIFIC_STAGE_BY_MODULE[moduleId] || moduleId || null;
+}
+
+export function scientificModuleId(stageId) {
+  return SCIENTIFIC_MODULE_BY_STAGE[stageId] || stageId || null;
+}
+
+export function scientificNodeForStage(branch, stageId) {
+  if (!branch || typeof branch !== "object") return null;
+  const nodes = branch.nodes;
+  if (!nodes || typeof nodes !== "object" || Array.isArray(nodes)) return null;
+  const node = nodes[scientificModuleId(stageId)];
+  return node && typeof node === "object" && !Array.isArray(node) ? node : null;
+}
+
+export function scientificCandidateId(branch) {
+  const node = scientificNodeForStage(branch, "hypothesis");
+  const artifact = node && node.artifact;
+  if (artifact && typeof artifact === "object") {
+    const document = artifact.hypothesis;
+    const hypothesis =
+      document && typeof document === "object" && document.hypothesis &&
+      typeof document.hypothesis === "object"
+        ? document.hypothesis
+        : null;
+    if (hypothesis && typeof hypothesis.id === "string" && hypothesis.id.trim()) {
+      return hypothesis.id;
+    }
+    const cards = artifact.cards;
+    if (cards && Array.isArray(cards.hypotheses)) {
+      const card = cards.hypotheses.find(
+        (item) => item && typeof item.id === "string" && item.id.trim(),
+      );
+      if (card) return card.id;
+    }
+  }
+  return branch && typeof branch.branch_id === "string" ? branch.branch_id : null;
+}
+
+export function scientificHighlanderCandidate(result, candidateId) {
+  if (!result || typeof result !== "object" || !candidateId) return null;
+  if (!Array.isArray(result.candidates)) return null;
+  return (
+    result.candidates.find(
+      (candidate) =>
+        candidate &&
+        typeof candidate === "object" &&
+        candidate.candidateId === candidateId,
+    ) || null
+  );
+}
+
+export function scientificComparisonStatus(result, candidateId) {
+  const candidate = scientificHighlanderCandidate(result, candidateId);
+  if (candidate && typeof candidate.comparisonStatus === "string") {
+    return candidate.comparisonStatus;
+  }
+  if (!result || typeof result !== "object" || !candidateId) return null;
+  if (Array.isArray(result.frontier) && result.frontier.includes(candidateId)) {
+    return "FRONTIER";
+  }
+  if (Array.isArray(result.dominated) && result.dominated.includes(candidateId)) {
+    return "DOMINATED";
+  }
+  if (
+    Array.isArray(result.incomparable) &&
+    result.incomparable.some(
+      (item) => item && typeof item === "object" && item.candidateId === candidateId,
+    )
+  ) {
+    return "INCOMPARABLE";
+  }
+  return null;
+}
