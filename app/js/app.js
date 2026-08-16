@@ -92,7 +92,9 @@
           support: { label: "Atomistic support", unit: "/100", domain: [0, 100], basis: "No values available: target module is not wired." },
           occupancy: { label: "Pose occupancy", unit: "%", domain: [0, 100], basis: "No values available: target module is not wired." },
           convergence: { label: "Convergence", unit: "%", domain: [0, 100], basis: "No values available: target module is not wired." },
-          tractability_fit: { label: "Branch tractability fit", unit: "/100 representative", domain: [0, 100], basis: "Representative branch-context fit; not an atomistic metric or native module output." }
+          tractability_fit: { label: "Representative branch fit", unit: "/100 representative", domain: [0, 100], basis: "Representative branch-context fit for demo comparison; not a native tractability output." },
+          precedent: { label: "Retrieved precedent", unit: "native categorical", categorical: true, basis: "Native retrieved-precedent verdict and observations; no scalar score is inferred." },
+          computed: { label: "Computed pocket evidence", unit: "native categorical", categorical: true, basis: "Native computed tractability observations; reported independently from retrieved precedent and never converted to a score." }
         }
       };
 
@@ -252,6 +254,31 @@
           .replace(/simulated[_ ]months[_ ]to[_ ]enroll/gi, "modeled enrollment duration")
           .replace(/simulated[_ ]months[_ ]range/gi, "modeled enrollment range")
           .replace(/\bsimulated\b/gi, "modeled");
+      }
+
+      // Reason codes remain available in the inspector's audit sections. Node cards
+      // need a concise outcome, not an internal enum that reads like scientific copy.
+      function publicReasonSummary(node) {
+        var reason = node && typeof node.reason === "string" ? node.reason.trim() : "";
+        if (!reason) return null;
+        var code = reason.split(" · ")[0];
+        var known = {
+          PINNED_ARTIFACT_REVALIDATED: "Recorded producer artifact revalidated; scientific result unchanged.",
+          MODULE_CONFIGURED_CACHED: "Cached producer artifact used for this run.",
+          RUNTIME_UNAVAILABLE: "Live runtime unavailable; labeled fallback shown.",
+          MODULE_NOT_WIRED: "No producer artifact was created for this stage.",
+          NOT_AMENABLE: "No tractability result; the stated mechanism is not amenable.",
+          MOCK_ECONOMICS_FAILURE: "Economics record unavailable; value remains missing.",
+          MOCK_FORECAST_FAILURE: "Recruitability record unavailable; sibling branches continued."
+        };
+        if (known[code]) return known[code];
+        if (/^[A-Z][A-Z0-9_]*$/.test(code)) {
+          if (node.outputOrigin === "CACHED") return "Cached producer artifact shown; see audit details.";
+          if (node.outputOrigin === "DEMO_FALLBACK") return "Labeled fallback artifact shown; see audit details.";
+          if (node.execution === "COMPLETE") return "Producer completed; see audit details.";
+          return "Terminal producer outcome; see audit details.";
+        }
+        return judgeFacingText(reason);
       }
 
       function announce(message) {
@@ -838,8 +865,14 @@
             node.resultBasis = httpMode ? (hasSimulationPayload ? "BACKEND-REPORTED" : "MISSING") : (program.notAmenable ? "NO RESULT" : "NOT WIRED");
             node.runtime = httpMode ? "BACKEND SNAPSHOT" : "NOT WIRED";
             node.outputOrigin = httpMode ? (hasSimulationPayload ? "UNREPORTED" : "NOT_RUN") : "NOT_RUN";
-            node.metrics = program.displayMetricBasis === "REPRESENTATIVE_DEMO_SCENARIO_V1"
-              ? { tractability_fit: program.metrics.tractability_fit }
+            node.metrics = httpMode
+              ? {
+                  tractability_fit: program.displayMetricBasis === "REPRESENTATIVE_DEMO_SCENARIO_V1"
+                    ? program.metrics.tractability_fit
+                    : null,
+                  precedent: null,
+                  computed: null
+                }
               : { support: null, occupancy: null, convergence: null };
             node.uncertainty = httpMode
               ? (program.tractabilityUncertainty || "No scalar atomistic metric is imputed; inspect the native tractability interpretation.")
@@ -888,8 +921,93 @@
         return METRICS[node.stage][metricKey];
       }
 
+      function simulationMetricView(payload, key) {
+        if (key !== "precedent" && key !== "computed") return null;
+        var artifact = payload && typeof payload === "object"
+          ? (payload.output && typeof payload.output === "object" ? payload.output : payload)
+          : {};
+        var verdict = typeof artifact.verdict === "string" ? artifact.verdict : null;
+        var verdictBasis = typeof artifact.verdict_basis === "string" ? artifact.verdict_basis : null;
+        var verdictLabel = verdict ? verdict.replace(/_/g, " ") : null;
+
+        if (key === "precedent") {
+          var precedent = artifact.target_precedent && typeof artifact.target_precedent === "object"
+            ? artifact.target_precedent
+            : {};
+          var precedentFacts = [];
+          if (typeof precedent.best_potency_nm === "number" && Number.isFinite(precedent.best_potency_nm)) {
+            precedentFacts.push("Best measured potency " + precedent.best_potency_nm + " nM");
+          }
+          if (typeof precedent.approved_small_molecules_count === "number" && Number.isFinite(precedent.approved_small_molecules_count)) {
+            precedentFacts.push(precedent.approved_small_molecules_count + " approved small molecule" + (precedent.approved_small_molecules_count === 1 ? "" : "s"));
+          }
+          if (Array.isArray(precedent.clinical_stage_small_molecules)) {
+            precedentFacts.push(precedent.clinical_stage_small_molecules.length + " clinical-stage small molecule" + (precedent.clinical_stage_small_molecules.length === 1 ? "" : "s"));
+          }
+          var precedentBearing = verdictBasis === "retrieved_precedent";
+          var supports = Boolean(verdict && /tractable/i.test(verdict) && !/(?:not|non)[_ -]?tractable|untractable/i.test(verdict));
+          var opposes = Boolean(verdict && /(?:not|non)[_ -]?tractable|untractable/i.test(verdict));
+          var precedentReported = precedentBearing || precedentFacts.length > 0;
+          return {
+            kind: "categorical",
+            display: precedentReported
+              ? (supports ? "Supports tractability · retrieved" : (opposes ? "Does not support · retrieved" : "Retrieved precedent · reported"))
+              : "Retrieved precedent · not reported",
+            detail: precedentFacts.length
+              ? precedentFacts.join(" · ") + "."
+              : (precedentBearing && verdictLabel ? "Native verdict: " + verdictLabel + "." : "The native artifact did not report retrieved-precedent observations."),
+            placement: precedentReported ? (supports ? "supported" : (opposes ? "not-supported" : "reported")) : "missing",
+            sourcePaths: ["verdict_basis", "verdict", "target_precedent"],
+            scalar: null
+          };
+        }
+
+        var computed = artifact.tractability && typeof artifact.tractability === "object"
+          ? artifact.tractability
+          : {};
+        var rank = computed.site_pocket_rank && typeof computed.site_pocket_rank === "object"
+          ? computed.site_pocket_rank
+          : {};
+        var volume = computed.pocket_volume_a3 && typeof computed.pocket_volume_a3 === "object"
+          ? computed.pocket_volume_a3
+          : {};
+        var computedFacts = [];
+        if (typeof rank.fpocket === "number" && Number.isFinite(rank.fpocket)) {
+          computedFacts.push("fPocket rank " + rank.fpocket + (typeof rank.n_pockets === "number" ? " of " + rank.n_pockets : ""));
+        }
+        if (typeof rank.prank === "number" && Number.isFinite(rank.prank)) computedFacts.push("PRANK rank " + rank.prank);
+        if (typeof volume.primary_d1_6_a3 === "number" && Number.isFinite(volume.primary_d1_6_a3)) {
+          computedFacts.push("Site volume " + volume.primary_d1_6_a3 + " Å³");
+        }
+        if (typeof computed.cryptic_pocket_risk === "string" && computed.cryptic_pocket_risk) {
+          computedFacts.push("Cryptic-pocket risk " + computed.cryptic_pocket_risk.replace(/_/g, " "));
+        }
+        var computedReported = Object.keys(computed).length > 0 || computedFacts.length > 0;
+        var axisConflict = artifact.axis_conflict !== null && artifact.axis_conflict !== undefined && artifact.axis_conflict !== false;
+        var computedCarriesVerdict = verdictBasis === "computed_tractability";
+        return {
+          kind: "categorical",
+          display: computedReported
+            ? (axisConflict ? "Computed evidence · axis conflict" : (computedCarriesVerdict ? "Computed evidence · informs verdict" : "Computed evidence · context only"))
+            : "Computed evidence · not reported",
+          detail: computedFacts.length
+            ? computedFacts.join(" · ") + ". " + (computedCarriesVerdict ? "This axis informs the native verdict." : "This axis does not carry the native verdict.")
+            : "The native artifact did not report computed pocket observations.",
+          placement: computedReported ? (axisConflict ? "conflict" : (computedCarriesVerdict ? "verdict-bearing" : "reported")) : "missing",
+          sourcePaths: ["tractability", "axis_conflict", "verdict_basis"],
+          scalar: null
+        };
+      }
+
+      function activeSimulationView(node) {
+        if (!node || node.stage !== "simulation") return null;
+        return simulationMetricView(node.metadata && node.metadata.stationPayload, state.metrics.simulation);
+      }
+
       function metricValue(node) {
         if (!METRICS[node.stage]) return null;
+        var categoricalView = activeSimulationView(node);
+        if (categoricalView) return categoricalView;
         return Object.prototype.hasOwnProperty.call(node.metrics, state.metrics[node.stage])
           ? node.metrics[state.metrics[node.stage]]
           : null;
@@ -900,6 +1018,7 @@
         var definition = metricDefinition(node);
         if (!definition) return "Fixed root";
         var value = metricValue(node);
+        if (value && typeof value === "object" && value.kind === "categorical") return value.display;
         if (value === null || typeof value !== "number" || Number.isNaN(value)) {
           return node.kind === "pending" ? "Pending · shelf" : "Missing · shelf";
         }
@@ -919,6 +1038,19 @@
         if (node.kind === "scaffold" || node.kind === "pending") return bandTop + GRAPH_GEOMETRY.shelfOffset;
         var definition = metricDefinition(node);
         var value = metricValue(node);
+        if (value && typeof value === "object" && value.kind === "categorical") {
+          if (value.placement === "missing") return bandTop + GRAPH_GEOMETRY.shelfOffset;
+          var categoricalPlacement = {
+            "not-supported": 0.18,
+            conflict: 0.42,
+            reported: 0.62,
+            "verdict-bearing": 0.82,
+            supported: 0.88
+          };
+          var displayPosition = categoricalPlacement[value.placement];
+          if (typeof displayPosition !== "number") return bandTop + GRAPH_GEOMETRY.shelfOffset;
+          return bandTop + GRAPH_GEOMETRY.plotOffset + displayPosition * GRAPH_GEOMETRY.plotTravel;
+        }
         if (!definition || value === null || typeof value !== "number" || Number.isNaN(value)) return bandTop + GRAPH_GEOMETRY.shelfOffset;
         var normalized = (value - definition.domain[0]) / (definition.domain[1] - definition.domain[0]);
         normalized = Math.max(0, Math.min(1, normalized));
@@ -962,6 +1094,23 @@
         var preview = descendantsOf(state.previewId);
         preview.add(state.previewId);
         return preview;
+      }
+
+      function nodeCardDetail(node) {
+        if (node.kind === "scaffold") {
+          return node.metadata.retired
+            ? "Unused capacity · no record created."
+            : "Requested capacity · awaiting an identity.";
+        }
+        if (node.kind === "pending") return "Identity bound · stage output pending.";
+        var reasonSummary = publicReasonSummary(node);
+        if (reasonSummary) return reasonSummary;
+        if (BOOT.mode === "http" && node.metadata.stationPayload) {
+          return node.stage === "simulation"
+            ? "Native tractability dossier · choose an evidence view."
+            : "Native producer artifact · interpretation and provenance attached.";
+        }
+        return node.metadata.summary || node.uncertainty || "No additional public summary supplied.";
       }
 
       function renderGraph() {
@@ -1008,11 +1157,7 @@
               ? '<div class="node-badges http-truth"><span class="badge ' + executionClass + '">' + escapeHTML(node.execution) + '</span><span class="badge proxy">' + escapeHTML(node.resultBasis) + '</span><span class="badge">' + escapeHTML(node.outputOrigin || "UNREPORTED") + '</span><span class="badge">' + escapeHTML(node.runtime) + "</span></div>"
               : '<div class="node-badges"><span class="badge ' + executionClass + '">' + escapeHTML(node.execution) + '</span><span class="badge proxy">' + escapeHTML(node.resultBasis) + '</span><span class="badge">' + escapeHTML(node.runtime) + "</span></div>";
           }
-          var nodeDetail = node.kind === "scaffold"
-            ? (node.metadata.retired ? "Unused requested capacity · no scientific record created." : "Requested capacity · identity has not been created.")
-            : node.kind === "pending"
-              ? "Candidate identity exists · selected stage output is pending."
-              : (node.reason || node.metadata.summary || node.uncertainty || "No additional public summary supplied.");
+          var nodeDetail = nodeCardDetail(node);
           nodeElement.innerHTML = '<span class="node-stage-label">' + escapeHTML(node.kind === "scaffold" ? "requested capacity" : node.stage) + '</span><span class="node-label">' + escapeHTML(node.label) + '</span><span class="node-value">' + escapeHTML(formatMetric(node)) + '</span><span class="node-detail">' + escapeHTML(nodeDetail) + "</span>" + badges;
           elements.graphNodes.appendChild(nodeElement);
         });
@@ -1213,11 +1358,18 @@
           });
           var qualifiers = Array.isArray(node.metadata.qualifiers) ? node.metadata.qualifiers : [];
           var origin = node.metadata.outputOrigin || node.outputOrigin || "UNREPORTED";
+          var categoricalView = activeSimulationView(node);
           var liveDefinition = definition
-            ? definition.label + " · " + definition.unit + " · display domain " + definition.domain[0] + "–" + definition.domain[1] + "."
+            ? definition.label + " · " + definition.unit + (definition.domain ? " · display domain " + definition.domain[0] + "–" + definition.domain[1] : "") + ". " + definition.basis
             : "Backend-provided run record.";
-          if (node.stage === "simulation") liveDefinition = "Native tractability dossier; no scalar atomistic metric is imputed.";
-          if (node.metadata.displayMetricBasis === "REPRESENTATIVE_DEMO_SCENARIO_V1") {
+          if (node.stage === "simulation" && categoricalView) {
+            liveDefinition = definition.label + " · categorical native view; no scalar score is inferred. " + categoricalView.detail;
+          } else if (node.stage === "simulation") {
+            liveDefinition = state.metrics.simulation === "tractability_fit"
+              ? "Representative branch-context fit for demo comparison; not a native tractability output."
+              : "Native tractability dossier; no scalar atomistic metric is imputed.";
+          }
+          if (node.metadata.displayMetricBasis === "REPRESENTATIVE_DEMO_SCENARIO_V1" && state.metrics[node.stage] === "tractability_fit") {
             liveDefinition = (definition ? definition.label + " · " + definition.unit + ". " : "") + "Representative branch value for demo comparison; not a native module output. The native artifact remains attached unchanged.";
           }
           var interpretability = node.metadata.stationPayload && (
@@ -1365,7 +1517,7 @@
 
       // Every metric key the UI tests with === null; wire omissions must become
       // null (missing shelf), never undefined, or dominates()/renderParetoPlot misbehave.
-      var WIRE_METRIC_KEYS = ["boldness", "evidence", "plausibility", "rnpv", "positive", "impact", "recruit", "duration", "screens", "risk", "support", "occupancy", "convergence", "tractability_fit"];
+      var WIRE_METRIC_KEYS = ["boldness", "evidence", "plausibility", "rnpv", "positive", "impact", "recruit", "duration", "screens", "risk", "support", "occupancy", "convergence", "tractability_fit", "precedent", "computed"];
 
       function finiteNumber(value) {
         return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -1492,7 +1644,9 @@
             support: null,
             occupancy: null,
             convergence: null,
-            tractability_fit: null
+            tractability_fit: null,
+            precedent: null,
+            computed: null
           };
           var program = {
             id: branch.branch_id || "scientific-branch-" + (index + 1),
@@ -1646,6 +1800,21 @@
         document.getElementById("module-dialog-summary").textContent = "This scientific run exposes exact per-branch producer artifacts, refs, hashes, origins, terminal reasons, and the server Highlander result.";
       }
 
+      function conciseStageNote(stage, status) {
+        if (status === "RUNNING") return "Running";
+        if (status === "FAILED") return "Terminal · gaps";
+        if (status === "COMPLETE_WITH_WARNINGS") return "Complete · warnings";
+        if (status === "COMPLETE") {
+          var origin = stage && typeof stage.output_origin === "string" ? stage.output_origin : "";
+          if (origin === "DETERMINISTIC_REPLAY") return "Complete · replay";
+          if (origin === "CACHED") return "Complete · cached";
+          if (origin === "DEMO_FALLBACK") return "Complete · fallback";
+          if (origin === "LIVE") return "Complete · live";
+          return "Complete";
+        }
+        return "Queued";
+      }
+
       function ingestSnapshot(ws) {
         var hadPrograms = Boolean(state.runData && state.runData.programs && state.runData.programs.length);
         var scientific = isScientificSnapshot(ws);
@@ -1680,7 +1849,7 @@
             status === "COMPLETE" ? "complete" :
             status === "COMPLETE_WITH_WARNINGS" ? "warning" :
             status === "FAILED" ? "failed" : "queued";
-          state.stageNotes[index] = stage.note || status.toLowerCase();
+          state.stageNotes[index] = conciseStageNote(stage, status);
           if (status === "RUNNING") markStagePending(mappedStageId);
           if (status === "COMPLETE" || status === "COMPLETE_WITH_WARNINGS" || status === "FAILED") bindStage(mappedStageId);
         });
@@ -1842,8 +2011,8 @@
           return;
         }
         if (nonterminal > 0) {
-          elements.readinessState.textContent = "BLOCKED · " + nonterminal + " nonterminal stage" + (nonterminal === 1 ? "" : "s");
-          elements.packetCounts.innerHTML = '<span class="packet-count">0 complete</span><span class="packet-count">0 partial</span><span class="packet-count">' + programCount + ' running</span><span class="packet-count">' + nonterminal + " nonterminal stages</span>";
+          elements.readinessState.textContent = "WAITING · " + nonterminal + " stage" + (nonterminal === 1 ? "" : "s");
+          elements.packetCounts.innerHTML = '<span class="packet-count">0 complete</span><span class="packet-count">0 partial</span><span class="packet-count">' + programCount + ' running</span><span class="packet-count">' + nonterminal + " waiting</span>";
           elements.gapConfirm.classList.remove("visible");
           elements.launchHighlander.disabled = true;
           elements.launchHighlander.textContent = launchName + " · blocked";
@@ -1854,14 +2023,14 @@
           : 0;
         var blockedCount = state.scientificSnapshot ? programCount - completeCount : 0;
         elements.readinessState.textContent = state.scientificSnapshot
-          ? "SERVER HIGHLANDER READY · terminal producer packets"
-          : "READY WITH TERMINAL GAPS · no nonterminal records";
-        elements.packetCounts.innerHTML = '<span class="packet-count">' + completeCount + ' complete</span><span class="packet-count">' + (state.scientificSnapshot ? 0 : programCount) + ' partial</span><span class="packet-count">' + blockedCount + ' blocked</span><span class="packet-count">0 nonterminal</span>';
+          ? "READY · terminal packets"
+          : "READY · terminal gaps";
+        elements.packetCounts.innerHTML = '<span class="packet-count">' + completeCount + ' complete</span><span class="packet-count">' + (state.scientificSnapshot ? 0 : programCount) + ' partial</span><span class="packet-count">' + blockedCount + ' blocked</span><span class="packet-count">0 waiting</span>';
         elements.gapConfirm.classList.add("visible");
         elements.launchHighlander.disabled = !elements.gapConfirmInput.checked;
         elements.launchHighlander.textContent = elements.gapConfirmInput.checked
           ? launchName + " →"
-          : (state.scientificSnapshot ? "Acknowledge terminal packets to run" : (BOOT.mode === "http" ? "Acknowledge gaps to continue" : "Acknowledge gaps to launch"));
+          : (state.scientificSnapshot ? "Acknowledge packets" : (BOOT.mode === "http" ? "Acknowledge gaps" : "Acknowledge gaps to launch"));
       }
 
       function resetDemo() {
@@ -2662,6 +2831,7 @@
             document.querySelectorAll('[data-metric-stage="' + stage + '"]').forEach(function (candidate) {
               candidate.setAttribute("aria-pressed", candidate === button ? "true" : "false");
             });
+            if (stage === "simulation" && BOOT.mode === "http") updateSimulationAxis(value);
             renderGraph();
             var xStable = state.nodes.every(function (node) { return priorX.get(node.id) === node.x; });
             announce(METRICS[stage][value].label + " selected. Presentation changed; stored records and x lanes " + (xStable ? "remain unchanged." : "changed unexpectedly."));
@@ -2733,6 +2903,47 @@
         });
       }
 
+      function updateSimulationAxis(metricKey) {
+        var rail = document.querySelector('.rail-band[data-stage="simulation"]');
+        var low = rail.querySelector(".axis-low");
+        var high = rail.querySelector(".axis-high");
+        var source = document.getElementById("simulation-axis-source");
+        if (metricKey === "precedent") {
+          low.textContent = "not established · top";
+          high.textContent = "supported · bottom";
+          source.innerHTML = "native verdict<br>categorical";
+          return;
+        }
+        if (metricKey === "computed") {
+          low.textContent = "not reported · top";
+          high.textContent = "reported · bottom";
+          source.innerHTML = "native pocket evidence<br>categorical";
+          return;
+        }
+        low.textContent = "low · top";
+        high.textContent = "high · bottom";
+        source.innerHTML = "0–100<br>representative";
+      }
+
+      function configureHttpTractabilityControls(defaultMetric) {
+        var controls = [
+          { key: "tractability_fit", label: "Representative branch fit" },
+          { key: "precedent", label: "Retrieved precedent" },
+          { key: "computed", label: "Computed pocket evidence" }
+        ];
+        state.metrics.simulation = defaultMetric;
+        document.querySelectorAll('[data-metric-stage="simulation"]').forEach(function (button, index) {
+          var control = controls[index];
+          if (!control) return;
+          button.dataset.metricValue = control.key;
+          button.textContent = control.label;
+          button.hidden = false;
+          button.title = METRICS.simulation[control.key].basis;
+          button.setAttribute("aria-pressed", control.key === defaultMetric ? "true" : "false");
+        });
+        updateSimulationAxis(defaultMetric);
+      }
+
       function applyBootMode() {
         if (BOOT.mode !== "http") return;
 
@@ -2741,19 +2952,7 @@
         setupModeChip.classList.remove("mock");
         elements.runButton.textContent = "Run local exploration →";
         document.querySelector('.rail-band[data-stage="simulation"] h2').textContent = "Target tractability";
-        state.metrics.simulation = "tractability_fit";
-        document.querySelectorAll('[data-metric-stage="simulation"]').forEach(function (button) {
-          if (button.dataset.metricValue === "support") {
-            button.dataset.metricValue = "tractability_fit";
-            button.textContent = "Branch tractability fit";
-            button.hidden = false;
-            button.setAttribute("aria-pressed", "true");
-          } else {
-            button.hidden = true;
-            button.setAttribute("aria-pressed", "false");
-          }
-        });
-        document.getElementById("simulation-axis-source").innerHTML = "0–100<br>representative";
+        configureHttpTractabilityControls("tractability_fit");
         document.getElementById("gap-confirm-copy").textContent = "I acknowledge terminal packet gaps, cached outputs, and labeled fallbacks. Continue to the advisory client-side comparison.";
         document.getElementById("restart-demo").textContent = "Refresh snapshot now";
         elements.freshnessButton.style.display = "none"; // freshness is real in http mode
@@ -2779,19 +2978,7 @@
           elements.runButton.textContent = "Run scientific branch pipeline →";
           elements.maxHypotheses.value = "1";
           elements.maxHypotheses.disabled = true;
-          state.metrics.simulation = "support";
-          document.querySelectorAll('[data-metric-stage="simulation"]').forEach(function (button) {
-            if (button.dataset.metricValue === "tractability_fit") {
-              button.dataset.metricValue = "support";
-              button.textContent = "Native dossier (categorical)";
-              button.hidden = false;
-              button.setAttribute("aria-pressed", "true");
-            } else {
-              button.hidden = true;
-              button.setAttribute("aria-pressed", "false");
-            }
-          });
-          document.getElementById("simulation-axis-source").innerHTML = "categorical<br>native artifact";
+          configureHttpTractabilityControls("precedent");
           document.getElementById("highlander-mode-description").textContent = "Server-native producer packet comparison";
           document.getElementById("highlander-mode-chip").textContent = "SERVER HIGHLANDER";
           document.getElementById("highlander-server-chip").textContent = "AWAITING PACKETS";

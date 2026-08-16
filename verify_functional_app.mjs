@@ -150,6 +150,8 @@ for (const required of [
   "normalizeStageTruth",
   "stationPayloadFor",
   "interpretabilityView",
+  "simulationMetricView",
+  "publicReasonSummary",
   "HIGHLANDER CLIENT-SIDE · SERVER CONSUMER NOT WIRED",
   "labrador.run-setup.v3",
   "Run server Highlander",
@@ -185,6 +187,28 @@ assert.match(styles, /\.pareto-depth-grid\s*\{/);
 assert.match(styles, /\.pareto-frontier-line\s*\{/);
 assert.match(contract, /fills the\s+remaining comparison-panel height/i);
 
+const stageFiveControls = Array.from(
+  html.matchAll(
+    /data-metric-stage="simulation"[^>]+data-metric-value="([^"]+)"/g,
+  ),
+  (match) => match[1],
+);
+assert.deepEqual(
+  stageFiveControls,
+  ["tractability_fit", "precedent", "computed"],
+  "Stage 05 must retain representative, retrieved-precedent, and computed views",
+);
+assert.match(app, /kind:\s*"categorical"/);
+assert.match(app, /scalar:\s*null/);
+assert.match(app, /sourcePaths:\s*\["verdict_basis",\s*"verdict",\s*"target_precedent"\]/);
+assert.match(app, /sourcePaths:\s*\["tractability",\s*"axis_conflict",\s*"verdict_basis"\]/);
+assert.match(app, /var reasonSummary = publicReasonSummary\(node\)/);
+assert.doesNotMatch(
+  app,
+  /:\s*\(node\.reason \|\| node\.metadata\.summary/,
+  "raw backend reason enums must not be used as primary node-card copy",
+);
+
 const comparisonPanelRule = styles.match(/\[data-region="program-comparison"\]\s*\{([^}]*)\}/s);
 assert.ok(comparisonPanelRule, "the comparison panel must expose its stable layout hook");
 assert.match(comparisonPanelRule[1], /display:\s*flex/);
@@ -202,10 +226,47 @@ assert.match(paretoPlotRule[1], /min-height:\s*0/);
 assert.match(paretoPlotRule[1], /height:\s*100%/);
 assert.match(paretoPlotRule[1], /flex:\s*1\s+1\s+auto/);
 
+const graphScreenRule = styles.match(/\.graph-screen\s*\{([^}]*)\}/s);
+assert.ok(graphScreenRule, "the graph screen must declare its header geometry");
+assert.match(graphScreenRule[1], /--graph-header:\s*160px/);
+const progressNameRule = styles.match(/\.progress-step strong\s*\{([^}]*)\}/s);
+assert.ok(progressNameRule, "progress stage names must expose a stable text rule");
+assert.match(progressNameRule[1], /overflow-wrap:\s*anywhere/);
+assert.doesNotMatch(progressNameRule[1], /white-space:\s*nowrap|text-overflow:\s*ellipsis/);
+const progressStateRule = styles.match(/\.progress-step \.stage-state\s*\{([^}]*)\}/s);
+assert.ok(progressStateRule, "progress stage state must expose a stable text rule");
+assert.match(progressStateRule[1], /display:\s*block/);
+assert.match(progressStateRule[1], /overflow-wrap:\s*anywhere/);
+assert.doesNotMatch(progressStateRule[1], /white-space:\s*nowrap|text-overflow:\s*ellipsis/);
+
+const inspectorTitleRule = styles.match(/\.inspector-title h2\s*\{([^}]*)\}/s);
+assert.ok(inspectorTitleRule, "long inspector titles must have an explicit wrap rule");
+assert.match(inspectorTitleRule[1], /overflow-wrap:\s*anywhere/);
+assert.doesNotMatch(inspectorTitleRule[1], /white-space:\s*nowrap|text-overflow:\s*ellipsis/);
+assert.match(styles, /\.inspector-title h2:focus\s*\{[^}]*box-shadow:\s*inset 3px 0 0 var\(--green\)/s);
+const inspectorBodyRule = styles.match(/\.inspector-body\s*\{([^}]*)\}/s);
+assert.ok(inspectorBodyRule, "the inspector body must own its overflow behavior");
+assert.match(inspectorBodyRule[1], /overflow-x:\s*hidden/);
+assert.match(inspectorBodyRule[1], /overflow-y:\s*auto/);
+const inspectorGridRule = styles.match(/\.inspector-status-grid\s*\{([^}]*)\}/s);
+assert.ok(inspectorGridRule, "inspector status cards must have a shrinkable grid");
+assert.match(inspectorGridRule[1], /repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+
+assert.match(styles, /@media \(min-width:\s*1800px\)[\s\S]*--inspector-reserved:/);
+assert.match(styles, /\.graph-screen\.inspector-open \.run-header,[\s\S]*\.graph-screen\.inspector-open \.graph-scroller\s*\{\s*margin-right:\s*var\(--inspector-reserved\)/);
+assert.match(styles, /\.graph-screen\.inspector-open \.graph-footer\s*\{\s*right:\s*var\(--inspector-reserved\)/);
+assert.doesNotMatch(
+  styles,
+  /\.graph-screen\.inspector-open \.run-header,[\s\S]{0,180}padding-right:/,
+  "the docked inspector must reserve layout width rather than overlay content with padding",
+);
+
 console.log("Functional app integration verification passed.");
 console.log("  Stage truth: module execution remains separate from fallback origin.");
 console.log("  Payloads: biomarker singular and program stage maps are consumed.");
 console.log("  Interpretability: readable projection retains native JSON verbatim.");
+console.log("  Stage 05: representative, precedent, and computed views remain separate and non-scalar where required.");
+console.log("  Layout: progress, inspector, and wide-screen dock rules resist text and panel clipping.");
 console.log("  Backend base: integrated serving defaults to same origin.");
 console.log("  Highlander: returned plans map to the ROI × recruitability × simulation 3D view; the chart fills its panel.");
 console.log("  Scientific v1: native branches and server Highlander results stay separate from representative display values.");
