@@ -393,6 +393,11 @@ test("nine representative branches remain distinct and produce a three-record fr
   harness.hooks.ingestSnapshot(snapshot);
 
   assert.equal(harness.hooks.state.runData.programs.length, 9);
+  assert.deepEqual(
+    harness.hooks.state.runData.programs.map((program) => program.id),
+    Array.from({ length: 9 }, (_, lane) => `branch-${lane}`),
+    "the 3D plan map must receive nine stable, distinct plan identities",
+  );
   assert.equal(
     new Set(
       harness.hooks.state.runData.programs.map((program) =>
@@ -408,6 +413,46 @@ test("nine representative branches remain distinct and produce a three-record fr
       .map(([lane]) => lane),
     [0, 4, 5],
   );
+
+  const perturbedPlan = harness.hooks.state.runData.programs[1];
+  const baseline = { ...perturbedPlan.metrics };
+
+  perturbedPlan.metrics.plausibility = 100;
+  assert.equal(
+    harness.hooks.programStatus(perturbedPlan),
+    "dominated",
+    "plausibility remains comparison context and must not change three-axis Pareto membership",
+  );
+
+  perturbedPlan.metrics.tractability_fit = 99;
+  assert.equal(
+    harness.hooks.programStatus(perturbedPlan),
+    "non-dominated",
+    "changing the simulation / tractability axis must be able to change Pareto membership",
+  );
+
+  perturbedPlan.metrics.tractability_fit = null;
+  assert.equal(
+    harness.hooks.programStatus(perturbedPlan),
+    "incomparable",
+    "a plan missing the simulation / tractability axis must stay off the plotted frontier",
+  );
+
+  perturbedPlan.metrics = { ...baseline, rnpv: null };
+  assert.equal(
+    harness.hooks.programStatus(perturbedPlan),
+    "incomparable",
+    "a plan missing ROI must stay off the plotted frontier",
+  );
+
+  perturbedPlan.metrics = { ...baseline, recruit: null };
+  assert.equal(
+    harness.hooks.programStatus(perturbedPlan),
+    "incomparable",
+    "a plan missing recruitability must stay off the plotted frontier",
+  );
+
+  perturbedPlan.metrics = baseline;
   assert.equal(
     new Set(
       harness.hooks.state.runData.programs.map(
