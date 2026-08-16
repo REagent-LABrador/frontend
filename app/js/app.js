@@ -493,6 +493,14 @@
         elements.connectors.setAttribute("viewBox", "0 0 " + width + " " + GRAPH_GEOMETRY.canvasHeight);
       }
 
+      // Presentation only: start a fresh run with the indication root centered,
+      // so narrower viewports don't open onto empty canvas left of the tree.
+      function centerGraphOnRoot() {
+        var scroller = elements.graphScroller;
+        scroller.scrollTop = 0;
+        scroller.scrollLeft = Math.max(0, rootX() + GRAPH_GEOMETRY.nodeWidth / 2 - scroller.clientWidth / 2);
+      }
+
       function findNode(id) {
         return state.nodes.find(function (node) { return node.id === id; }) || null;
       }
@@ -1105,6 +1113,7 @@
         renderProgress();
         renderGraph();
         renderReadiness();
+        centerGraphOnRoot();
         updateFreshness("Run created on backend; polling snapshots");
         httpPoller = BOOT.http.startPolling(runId, {
           onSnapshot: function (ws) {
@@ -1228,6 +1237,7 @@
         renderProgress();
         renderGraph();
         renderReadiness();
+        centerGraphOnRoot();
         updateFreshness("Illustrative arrivals restarted");
         setTimer(function () { startStage(0); }, 400);
       }
